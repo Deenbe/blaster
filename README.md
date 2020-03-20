@@ -10,7 +10,7 @@ Given that we have an http endpoint that can handle a message stored in a Amazon
 we can start blaster like this:
 
 ```
-blaster start-sqs --queue-name "test" --region "ap-southeast-2" --target "http://localhost:9000/"
+blaster sqs --queue-name "test" --region "ap-southeast-2" --target "http://localhost:9000/"
 ```
 
 ### Road map

@@ -16,17 +16,18 @@ limitations under the License.
 package cmd
 
 import (
-	"github.com/spf13/cobra"
 	"blaster/lib"
+
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 )
 
 var queueName, region, httpHandlerURL string
 var maxNumberOfMesages, waitTimeSeconds int64
 
-// startSqsCmd represents the startSqs command
-var startSQSCmd = &cobra.Command{
-	Use:   "start-sqs",
+// sqsCmd represents the sqs command
+var sqsCmd = &cobra.Command{
+	Use:   "sqs",
 	Short: "Start a message pump for an AWS sqs backend",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -51,7 +52,7 @@ var startSQSCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(startSQSCmd)
+	rootCmd.AddCommand(sqsCmd)
 
 	// Here you will define your flags and configuration settings.
 
@@ -62,12 +63,12 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// startSqsCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	startSQSCmd.Flags().StringVarP(&queueName, "queue-name", "q", "", "queue name")
-	startSQSCmd.Flags().StringVarP(&region, "region", "r", "", "queue region")
-	startSQSCmd.Flags().Int64VarP(&maxNumberOfMesages, "max-number-of-messages", "m", 1, "max number of messages to receive in a single poll")
-	startSQSCmd.Flags().Int64VarP(&waitTimeSeconds, "wait-time-seconds", "w", 1, "wait time between polls")
-	startSQSCmd.Flags().StringVarP(&httpHandlerURL, "target", "t", "", "target http handler url")
-	startSQSCmd.MarkFlagRequired("queue-name")
-	startSQSCmd.MarkFlagRequired("region")
-	startSQSCmd.MarkFlagRequired("target")
+	sqsCmd.Flags().StringVarP(&queueName, "queue-name", "q", "", "queue name")
+	sqsCmd.Flags().StringVarP(&region, "region", "r", "", "queue region")
+	sqsCmd.Flags().Int64VarP(&maxNumberOfMesages, "max-number-of-messages", "m", 1, "max number of messages to receive in a single poll")
+	sqsCmd.Flags().Int64VarP(&waitTimeSeconds, "wait-time-seconds", "w", 1, "wait time between polls")
+	sqsCmd.Flags().StringVarP(&httpHandlerURL, "target", "t", "", "target http handler url")
+	sqsCmd.MarkFlagRequired("queue-name")
+	sqsCmd.MarkFlagRequired("region")
+	sqsCmd.MarkFlagRequired("target")
 }
