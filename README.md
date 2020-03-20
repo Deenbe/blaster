@@ -1,8 +1,22 @@
 # Blaster
+> Universal message pump for message brokers
 
-## Problem Statement
+Blaster is a cli utility to pump messages out of a message broker and forward them to a handler
+written in any language. Blaster communicates with the handler via traditional IPC mechanisms.
 
-- Messages are published to a queue for processing
-- Number of processing nodes pull messages and process them
-- It makes the process more efficient to pre-fetch messages as they are processed on each node
-- However, when message processing runs out of available resources, pre-fetched messages are not going to be available for another host with enough resources.
+### Usage
+
+Given that we have an http endpoint that can handle a message stored in a Amazon SQS queue,
+we can start blaster like this:
+
+```
+blaster start-sqs --queue-name "test" --region "ap-southeast-2" --target "http://localhost:9000/"
+```
+
+### Road map
+- Controls to throttle the pump based on various parameters and heuristics (CPU, Memory utilisation)
+- Configuration based message routing
+- Improve CLI to launch handler as part of boostrapping
+- All the other crazy stuff...
+
+
