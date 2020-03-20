@@ -16,6 +16,7 @@ limitations under the License.
 package cmd
 
 import (
+	"time"
 	"blaster/lib"
 
 	log "github.com/sirupsen/logrus"
@@ -23,7 +24,8 @@ import (
 )
 
 var queueName, region, httpHandlerURL string
-var maxNumberOfMesages, waitTimeSeconds int64
+var maxNumberOfMesages, waitTimeSeconds, retryDelaySeconds int64
+var retryCount int
 
 // sqsCmd represents the sqs command
 var sqsCmd = &cobra.Command{
@@ -44,7 +46,7 @@ var sqsCmd = &cobra.Command{
 		}
 
 		dispatcher := lib.NewHttpDispatcher(httpHandlerURL)
-		mp := lib.NewMessagePump(sqs, dispatcher)
+		mp := lib.NewMessagePump(sqs, dispatcher, retryCount, time.Second * time.Duration(retryDelaySeconds))
 		mp.Start()
 		log.Info("Message pump started")
 		err = <-mp.Done
@@ -65,9 +67,11 @@ func init() {
 	// startSqsCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	sqsCmd.Flags().StringVarP(&queueName, "queue-name", "q", "", "queue name")
 	sqsCmd.Flags().StringVarP(&region, "region", "r", "", "queue region")
+	sqsCmd.Flags().StringVarP(&httpHandlerURL, "target", "t", "", "target http handler url")
 	sqsCmd.Flags().Int64VarP(&maxNumberOfMesages, "max-number-of-messages", "m", 1, "max number of messages to receive in a single poll")
 	sqsCmd.Flags().Int64VarP(&waitTimeSeconds, "wait-time-seconds", "w", 1, "wait time between polls")
-	sqsCmd.Flags().StringVarP(&httpHandlerURL, "target", "t", "", "target http handler url")
+	sqsCmd.Flags().IntVarP(&retryCount, "retry-count", "c", 0, "number of retry attempts")
+	sqsCmd.Flags().Int64VarP(&retryDelaySeconds, "retry-delay-seconds", "d", 1, "delay between retry attempts")
 	sqsCmd.MarkFlagRequired("queue-name")
 	sqsCmd.MarkFlagRequired("region")
 	sqsCmd.MarkFlagRequired("target")
