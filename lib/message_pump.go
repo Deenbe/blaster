@@ -1,4 +1,4 @@
-package main
+package lib
 
 type Message struct {
 	MessageID  *string                `json:"messageId"`
