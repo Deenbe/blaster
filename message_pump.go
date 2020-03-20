@@ -29,6 +29,7 @@ type Dispatcher interface {
 type MessagePump struct {
 	QueueService QueueService
 	Dispatcher   Dispatcher
+	Done         chan error
 }
 
 type SQSConfiguration struct {
@@ -39,29 +40,33 @@ type SQSConfiguration struct {
 }
 
 func (p *MessagePump) Start() {
-	for {
-		msgs, err := p.QueueService.Read()
-		if err != nil {
-			panic(err)
-		}
+	go func() {
+		for {
+			msgs, err := p.QueueService.Read()
+			if err != nil {
+				p.Done <- err
+			}
 
-		for _, msg := range msgs {
-			go func() {
-				e := p.Dispatcher.Dispatch(msg)
-				if e != nil {
-					panic(e)
-				}
-				e = p.QueueService.Delete(msg)
-				if e != nil {
-					panic(e)
-				}
-			}()
+			for _, msg := range msgs {
+				go func() {
+					e := p.Dispatcher.Dispatch(msg)
+					if e != nil {
+						p.Done <- e
+						return
+					}
+					e = p.QueueService.Delete(msg)
+					if e != nil {
+						p.Done <- e
+						return
+					}
+				}()
+			}
 		}
-	}
+	}()
 }
 
 func NewMessagePump(queueReader QueueService, dispatcher Dispatcher) *MessagePump {
-	return &MessagePump{queueReader, dispatcher}
+	return &MessagePump{queueReader, dispatcher, make(chan error)}
 }
 
 type SQSService struct {
@@ -101,14 +106,14 @@ func (s *SQSService) Read() ([]*Message, error) {
 }
 
 func (s *SQSService) Delete(message *Message) error {
-	rh, ok := message.Properties["receiptHandle"].(string)
+	rh, ok := message.Properties["receiptHandle"].(*string)
 	if !ok {
 		panic("Unexpected input: SQS message without a receipt handle")
 	}
 
 	_, err := s.Client.DeleteMessage(&sqs.DeleteMessageInput{
 		QueueUrl:      &s.QueueUrl,
-		ReceiptHandle: &rh,
+		ReceiptHandle: rh,
 	})
 
 	if err != nil {

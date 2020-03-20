@@ -1,5 +1,9 @@
 package main
 
+import (
+	log "github.com/sirupsen/logrus"
+)
+
 func main() {
 	config := SQSConfiguration{
 		QueueName:           "fc-poc",
@@ -16,4 +20,6 @@ func main() {
 	dispatcher := NewHttpDispatcher("http://localhost:9000/")
 	mp := NewMessagePump(sqs, dispatcher)
 	mp.Start()
+	log.Info("Message pump started")
+	err = <-mp.Done
 }
