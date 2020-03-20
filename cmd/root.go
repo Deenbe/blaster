@@ -29,8 +29,8 @@ var cfgFile string
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "blaster",
-	Short: "Generic message pump for SQS",
-	Long: `Generic message pump for SQS`,
+	Short: "Universal message pump for message brokers",
+	Long: `Universal message pump for message brokers`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	//	Run: func(cmd *cobra.Command, args []string) { },
