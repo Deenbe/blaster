@@ -9,6 +9,7 @@ jobs:
     name: Build
     runs-on: ubuntu-18.04
     steps:
+      - uses: actions/checkout@v2
       - name: Test
         run: make test
       - name: Build
