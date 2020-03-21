@@ -19,8 +19,8 @@ jobs:
         id: create_release
         uses: actions/create-release@latest
         with:
-          tag_name: Release ${{ github.commit }}
-          release_name: Release ${{ github.commit }}
+          tag_name: pre-${{ GITHUB_SHA }}
+          release_name: pre-${{ GITHUB_SHA }}
           draft: false
           prerelease: false
         env:
