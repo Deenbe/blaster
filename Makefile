@@ -1,4 +1,4 @@
-.PHONY: build clean build-local
+.PHONY: build clean build-local test
 
 build: clean
 	go build -o ./build/blaster
