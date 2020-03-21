@@ -46,7 +46,7 @@ func (p *MessagePump) Start() {
 					}, "dispatch message %s", *msg.MessageID)
 
 					if e != nil {
-						log.Infof("message_pump: failed to dispatch message %s\n", msg.MessageID)
+						log.Infof("message_pump: failed to dispatch message %s\n", *msg.MessageID)
 					}
 
 					e = p.RetryPolicy.Execute(func() error {
@@ -54,7 +54,7 @@ func (p *MessagePump) Start() {
 					}, "delete message %s", *msg.MessageID)
 
 					if e != nil {
-						log.Infof("message_pump: failed to delete message %s\n", msg.MessageID)
+						log.Infof("message_pump: failed to delete message %s\n", *msg.MessageID)
 					}
 				}()
 			}
