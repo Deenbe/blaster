@@ -9,8 +9,24 @@ jobs:
     name: Build
     runs-on: ubuntu-18.04
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout 
+        uses: actions/checkout@v2
       - name: Test
         run: make test
       - name: Build
         run: make build 
+      - name: Create Release
+        uses: actions/create-release@latest
+        with:
+          tag_name: ${{ github.ref }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish Binary
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+          asset_path: ./build/blaster
+          asset_name: blaster
+          asset_content_type: application/octet-stream
