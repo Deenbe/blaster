@@ -3,7 +3,7 @@ os:
 - linux
 go:
 - 1.14.x
-script: make build
+script: ./build.sh
 matrix:
   allow_failures:
   - go: tip

@@ -6,8 +6,8 @@ build: clean
 clean:
 	rm -rf ./build
 
-test:
-	go test ./...
+test: build
+	go test -covermode=count -coverpkg="blaster,blaster/lib,blaster/cmd" -coverprofile=build/cover.out ./...
 
 build-local: build
 	cp ./build/blaster /usr/local/bin/
