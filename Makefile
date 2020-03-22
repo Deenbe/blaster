@@ -16,4 +16,4 @@ test: build
 	go test -covermode=count -coverpkg="blaster,blaster/lib,blaster/cmd" -coverprofile=build/cover.out ./...
 
 build-local: build
-	cp "./build/blaster_${TARGET}" /usr/local/bin/
+	cp "./build/blaster${TARGET}" /usr/local/bin/
