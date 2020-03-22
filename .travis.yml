@@ -1,0 +1,11 @@
+language: go
+os:
+- linux
+go:
+- 1.14.x
+script: make build
+matrix:
+  allow_failures:
+  - go: tip
+git:
+  submodules: false
