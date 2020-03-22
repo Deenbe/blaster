@@ -6,7 +6,8 @@ ifneq ("${SUFFIX}", "_")
 TARGET=_$(SUFFIX)
 endif
 
-build: go build -o "./build/blaster${TARGET}"
+build:
+	go build -o "./build/blaster${TARGET}"
 
 clean:
 	rm -rf ./build
