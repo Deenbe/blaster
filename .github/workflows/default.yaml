@@ -15,22 +15,4 @@ jobs:
         run: make test
       - name: Build
         run: make build 
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@latest
-        with:
-          tag_name: pre-${{ github.sha }}
-          release_name: pre-${{ github.sha }}
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish Binary
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-          asset_path: ./build/blaster
-          asset_name: blaster
-          asset_content_type: application/octet-stream
+      
