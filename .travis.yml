@@ -3,7 +3,10 @@ os:
 - linux
 go:
 - 1.14.x
-script: ./build.sh
+script: "./build.sh"
 matrix:
   allow_failures:
   - go: tip
+env:
+  global:
+    secure: eP1hCQamb/HvUxoLfYyg/l+8r3M6OdcDanyRTMKrsKlGPT023mTKve7vl/ZUek25g3V8rID+tqI2ktbZ8lawbTJsO36el/K6ZKNX7jTdTubbRfFLok4YIRt67neOKJeswaRVuySf/brB6lvwwU6KwXHlvL7w5R0MPpRVObj7VBEAEINdD8QwifbWoptJGfxKjWAR9vrRUOp5tJ+dKqSiNIjtV8jU3M1jaRheoC403BIlLFhyup/xwxx/RPwR6UoVIZB7OTKGb6Xs/rkGziYg5SW344US2PmqFtuXcl6nxLF8kY+ZahzGgWWnLX6sXuPTGAi1YnkdhoJv2R8r7w7KesXhKdehvMy2knj6xO/q8hVyKrIW6Lg7kjsj5qyL6c1+czLik0939GBswmYD7jdu8w0cjHweiP7gvTmgFFnUp4SBt3Q9pTKch7B+fX7fcWNt8bZa6VFSkvjE6JfZ/nJM5HSbnfdByy5abAuHYUrvBArQ5s1KMO92vp5HKD1uc774IwCarHJ4FxeYKTZxns9jgj9ARmk6iN9vbtnDATU+7HCwxFxqWo0P/Weo6dLaMf0Sau16fcLlmNvbT/j8piEVCGcTRDvXmYoxiHQLbmsmMFGeLnxtz5BiujMo5/X483HOb0xqCIJRGh9brBNZSxK3MyB79938qbp0dKkQZHmnRyE=
