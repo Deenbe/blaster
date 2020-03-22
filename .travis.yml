@@ -7,5 +7,3 @@ script: ./build.sh
 matrix:
   allow_failures:
   - go: tip
-git:
-  submodules: false
