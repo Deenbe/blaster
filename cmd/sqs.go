@@ -16,8 +16,8 @@ limitations under the License.
 package cmd
 
 import (
-	"time"
 	"blaster/lib"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -46,7 +46,7 @@ var sqsCmd = &cobra.Command{
 		}
 
 		dispatcher := lib.NewHttpDispatcher(httpHandlerURL)
-		mp := lib.NewMessagePump(sqs, dispatcher, retryCount, time.Second * time.Duration(retryDelaySeconds))
+		mp := lib.NewMessagePump(sqs, dispatcher, retryCount, time.Second*time.Duration(retryDelaySeconds))
 		mp.Start()
 		log.Info("Message pump started")
 		err = <-mp.Done

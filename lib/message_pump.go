@@ -7,14 +7,15 @@ import (
 )
 
 type Message struct {
-	MessageID  *string                `json:"messageId"`
-	Body       *string                `json:"body"`
+	MessageID  string                 `json:"messageId"`
+	Body       string                 `json:"body"`
 	Properties map[string]interface{} `json:"properties"`
 }
 
 type QueueService interface {
 	Read() ([]*Message, error)
 	Delete(*Message) error
+	Poison(*Message) error
 }
 
 type Dispatcher interface {
@@ -24,44 +25,72 @@ type Dispatcher interface {
 type MessagePump struct {
 	QueueService QueueService
 	Dispatcher   Dispatcher
-	Done         chan error
 	RetryPolicy  *RetryPolicy
+	Done         chan error
+	Stop         chan string
 }
 
 func (p *MessagePump) Start() {
 	go func() {
 		for {
-			msgs, err := p.QueueService.Read()
-			if err != nil {
-				// TODO: Add an error specialisation to
-				// to demarcate the errors that should stop the pump
-				p.Done <- err
-			}
-
-			log.Infof("message_pump: received %d messages\n", len(msgs))
-			for _, msg := range msgs {
-				go func() {
-					e := p.RetryPolicy.Execute(func() error {
-						return p.Dispatcher.Dispatch(msg)
-					}, "dispatch message %s", *msg.MessageID)
-
-					if e != nil {
-						log.Infof("message_pump: failed to dispatch message %s\n", *msg.MessageID)
-					}
-
-					e = p.RetryPolicy.Execute(func() error {
-						return p.QueueService.Delete(msg)
-					}, "delete message %s", *msg.MessageID)
-
-					if e != nil {
-						log.Infof("message_pump: failed to delete message %s\n", *msg.MessageID)
-					}
-				}()
+			select {
+			case reason := <-p.Stop:
+				log.WithFields(log.Fields{
+					"module": "message_pump",
+				}).Infof("message_pump: stopped with reason %s", reason)
+				p.Done <- nil
+				close(p.Done)
+				return
+			default:
+				p.pumpMain()
 			}
 		}
 	}()
 }
 
+func (p *MessagePump) pumpMain() {
+	messages, err := p.QueueService.Read()
+	if err != nil {
+		log.WithFields(log.Fields{
+			"module": "message_pump",
+			"error":  err,
+		}).Info("message_pump: failed to read from queue")
+		return
+	}
+
+	log.Infof("message_pump: received %d messages\n", len(messages))
+	p.dispatchAll(messages)
+}
+
+func (p *MessagePump) dispatchAll(messages []*Message) {
+	for _, m := range messages {
+		go p.dispatch(m)
+	}
+}
+
+func (p *MessagePump) dispatch(message *Message) {
+	e := p.RetryPolicy.Execute(func() error {
+		return p.Dispatcher.Dispatch(message)
+	}, "dispatch message %s", message.MessageID)
+
+	if e != nil {
+		log.Infof("message_pump: failed to dispatch message %s\n", message.MessageID)
+		e = p.QueueService.Poison(message)
+		if e != nil {
+			log.Infof("message_pump: failed to poison message %s\n", message.MessageID)
+		}
+		return
+	}
+
+	e = p.RetryPolicy.Execute(func() error {
+		return p.QueueService.Delete(message)
+	}, "delete message %s", message.MessageID)
+
+	if e != nil {
+		log.Infof("message_pump: failed to delete message %s\n", message.MessageID)
+	}
+}
+
 func NewMessagePump(queueReader QueueService, dispatcher Dispatcher, retryCount int, retryDelay time.Duration) *MessagePump {
-	return &MessagePump{queueReader, dispatcher, make(chan error), NewRetryPolicy(retryCount, retryDelay)}
+	return &MessagePump{queueReader, dispatcher, NewRetryPolicy(retryCount, retryDelay), make(chan error), make(chan string)}
 }

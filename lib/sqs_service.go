@@ -35,8 +35,8 @@ func (s *SQSService) Read() ([]*Message, error) {
 
 	for i, msg := range msgs.Messages {
 		result[i] = &Message{
-			MessageID: msg.MessageId,
-			Body:      msg.Body,
+			MessageID: *msg.MessageId,
+			Body:      *msg.Body,
 			Properties: map[string]interface{}{
 				"attributes":             msg.Attributes,
 				"messageAttributes":      msg.MessageAttributes,
@@ -65,6 +65,10 @@ func (s *SQSService) Delete(message *Message) error {
 		return errors.WithStack(err)
 	}
 
+	return nil
+}
+
+func (s *SQSService) Poison(message *Message) error {
 	return nil
 }
 
