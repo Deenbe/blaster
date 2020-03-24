@@ -3,6 +3,7 @@ package lib
 import (
 	"bytes"
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/pkg/errors"
@@ -18,12 +19,15 @@ func (d *HttpDispatcher) Dispatch(m *Message) error {
 		return errors.WithStack(err)
 	}
 
-	_, err = http.Post(d.HandlerUrl, "application/json", bytes.NewReader(output))
+	response, err := http.Post(d.HandlerUrl, "application/json", bytes.NewReader(output))
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	return nil
+	defer response.Body.Close()
+	_, err = ioutil.ReadAll(response.Body)
+
+	return err
 }
 
 func NewHttpDispatcher(handlerUrl string) *HttpDispatcher {
