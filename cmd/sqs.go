@@ -17,12 +17,13 @@ package cmd
 
 import (
 	"blaster/lib"
+	"fmt"
 	"time"
 
 	"github.com/spf13/cobra"
 )
 
-var queueName, region, httpHandlerURL string
+var queueName, region string
 var maxNumberOfMesages, waitTimeSeconds, retryDelaySeconds int64
 var retryCount int
 
@@ -44,7 +45,7 @@ var sqsCmd = &cobra.Command{
 			panic(err)
 		}
 
-		dispatcher := lib.NewHttpDispatcher(httpHandlerURL)
+		dispatcher := lib.NewHttpDispatcher(fmt.Sprintf("http://localhost:%d/", handlerPort))
 		mp := lib.NewMessagePump(sqs, dispatcher, retryCount, time.Second*time.Duration(retryDelaySeconds))
 		return lib.StartTheSystem(mp, handlerCommand, handlerArgv)
 	},
@@ -64,7 +65,6 @@ func init() {
 	// startSqsCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	sqsCmd.Flags().StringVarP(&queueName, "queue-name", "q", "", "queue name")
 	sqsCmd.Flags().StringVarP(&region, "region", "r", "", "queue region")
-	sqsCmd.Flags().StringVarP(&httpHandlerURL, "target", "t", "http://localhost:8312/", "target http handler url")
 	sqsCmd.Flags().Int64VarP(&maxNumberOfMesages, "max-number-of-messages", "m", 1, "max number of messages to receive in a single poll")
 	sqsCmd.Flags().Int64VarP(&waitTimeSeconds, "wait-time-seconds", "w", 1, "wait time between polls")
 	sqsCmd.Flags().IntVarP(&retryCount, "retry-count", "c", 0, "number of retry attempts")

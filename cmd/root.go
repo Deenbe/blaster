@@ -28,6 +28,7 @@ import (
 var cfgFile string
 var handlerCommand string
 var handlerArgv []string
+var handlerPort uint
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -62,6 +63,7 @@ func init() {
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	rootCmd.PersistentFlags().StringVar(&handlerCommand, "handler-command", "", "name of handler command")
 	rootCmd.PersistentFlags().StringSliceVar(&handlerArgv, "handler-args", nil, "arguments to handler")
+	sqsCmd.Flags().UintVarP(&handlerPort, "handler-port", "p", 8312, "local port handler is listening on")
 	rootCmd.MarkPersistentFlagRequired("handler-command")
 }
 
