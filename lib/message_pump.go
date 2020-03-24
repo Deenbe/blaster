@@ -1,6 +1,9 @@
 package lib
 
 import (
+	"context"
+	"os"
+	"os/signal"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -27,17 +30,17 @@ type MessagePump struct {
 	Dispatcher   Dispatcher
 	RetryPolicy  *RetryPolicy
 	Done         chan error
-	Stop         chan string
 }
 
-func (p *MessagePump) Start() {
+func (p *MessagePump) Start(ctx context.Context) {
 	go func() {
 		for {
 			select {
-			case reason := <-p.Stop:
+			case <-ctx.Done():
 				log.WithFields(log.Fields{
 					"module": "message_pump",
-				}).Infof("message_pump: stopped with reason %s", reason)
+					"error":  ctx.Err(),
+				}).Infof("message_pump: stopped")
 				p.Done <- nil
 				close(p.Done)
 				return
@@ -92,5 +95,23 @@ func (p *MessagePump) dispatch(message *Message) {
 }
 
 func NewMessagePump(queueReader QueueService, dispatcher Dispatcher, retryCount int, retryDelay time.Duration) *MessagePump {
-	return &MessagePump{queueReader, dispatcher, NewRetryPolicy(retryCount, retryDelay), make(chan error), make(chan string)}
+	return &MessagePump{queueReader, dispatcher, NewRetryPolicy(retryCount, retryDelay), make(chan error)}
+}
+
+func StartTheSystem(messagePump *MessagePump) {
+	ctx := context.Background()
+	cancelCtx, cancelFunc := context.WithCancel(ctx)
+
+	chanSignal := make(chan os.Signal, 1)
+	signal.Notify(chanSignal, os.Interrupt)
+
+	messagePump.Start(cancelCtx)
+
+	select {
+	case <-messagePump.Done:
+	case <-chanSignal:
+	}
+
+	cancelFunc()
+	<-messagePump.Done
 }
