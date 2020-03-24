@@ -4,7 +4,7 @@
 [![Build Status](https://travis-ci.org/buddyspike/blaster.svg?branch=master)](https://travis-ci.org/buddyspike/blaster) [![codecov](https://codecov.io/gh/buddyspike/blaster/branch/master/graph/badge.svg)](https://codecov.io/gh/buddyspike/blaster)
 
 Blaster is a cli utility to pump messages out of a message broker and forward them to a handler
-written in any language. Blaster communicates with the handler via traditional IPC mechanisms.
+written in any language. Handler must listen for incoming messages via an http endpoint.
 
 ### Usage
 
