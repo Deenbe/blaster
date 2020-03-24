@@ -8,11 +8,31 @@ written in any language. Blaster communicates with the handler via traditional I
 
 ### Usage
 
-Given that we have an http endpoint that can handle a message stored in a Amazon SQS queue,
-we can start blaster like this:
+#### Step 1: Write a handler
+Handler needs to expose the message handling function as an HTTP API. In this instance, we write a node script to achieve this.
+
+```javascript
+const express = require('express');
+
+const app = express();
+app.use(express.json());
+
+app.post('/', (req, res) => {
+    console.log(req.body);
+    res.write('ok');
+});
+
+app.listen(9000, () => {
+    console.log('listening');
+});
+```
+
+#### Step 2: Launch blaster
+
+Launch the handler with blaster (this should be executed in the directory containing node script):
 
 ```
-blaster sqs --queue-name "test" --region "ap-southeast-2" --target "http://localhost:9000/"
+blaster sqs --queue-name "test" --region "ap-southeast-2" --target "http://localhost:9000/" --handler-name node --handler-args handler.js
 ```
 
 ### Road map
