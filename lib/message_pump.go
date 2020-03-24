@@ -102,7 +102,7 @@ func NewMessagePump(queueReader QueueService, dispatcher Dispatcher, retryCount 
 	return &MessagePump{queueReader, dispatcher, NewRetryPolicy(retryCount, retryDelay), make(chan error)}
 }
 
-func StartTheSystem(messagePump *MessagePump) error {
+func StartTheSystem(messagePump *MessagePump, handlerName string, handlerArgv []string) error {
 	var err error
 	ctx := context.Background()
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
@@ -112,13 +112,18 @@ func StartTheSystem(messagePump *MessagePump) error {
 
 	messagePump.Start(cancelCtx)
 
+	h := NewHandlerManager(handlerName, handlerArgv)
+	h.Start(cancelCtx)
+
 	select {
 	case err = <-messagePump.Done:
+	case err = <-h.Done:
 	case <-chanSignal:
 	}
 
 	cancelFunc()
 	<-messagePump.Done
+	<-h.Done
 
 	return err
 }

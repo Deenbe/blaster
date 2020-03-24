@@ -2,6 +2,7 @@ package lib
 
 import (
 	"context"
+	"os"
 	"os/exec"
 )
 
@@ -14,7 +15,11 @@ type HandlerManager struct {
 func (h *HandlerManager) Start(ctx context.Context) {
 	go func() {
 		cmd := exec.CommandContext(ctx, h.Command, h.Argv...)
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
 		h.Done <- cmd.Run()
+		close(h.Done)
 	}()
 }
 

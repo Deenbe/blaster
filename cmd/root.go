@@ -26,6 +26,8 @@ import (
 )
 
 var cfgFile string
+var handlerName string
+var handlerArgv []string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -58,6 +60,9 @@ func init() {
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.PersistentFlags().StringVar(&handlerName, "handler-name", "", "name of handler process")
+	rootCmd.PersistentFlags().StringSliceVar(&handlerArgv, "handler-args", nil, "arguments to handler")
+	rootCmd.MarkPersistentFlagRequired("handler-name")
 }
 
 // initConfig reads in config file and ENV variables if set.
