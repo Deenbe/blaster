@@ -1,10 +1,14 @@
 # Blaster
-> Universal message pump for message brokers
+> Got a message? Just handle it!
 
 [![Build Status](https://travis-ci.org/buddyspike/blaster.svg?branch=master)](https://travis-ci.org/buddyspike/blaster) [![codecov](https://codecov.io/gh/buddyspike/blaster/branch/master/graph/badge.svg)](https://codecov.io/gh/buddyspike/blaster) [![Go Report Card](https://goreportcard.com/badge/github.com/buddyspike/blaster)](https://goreportcard.com/report/github.com/buddyspike/blaster)
 
 Blaster is a cli utility to pump messages out of a message broker and forward them to a handler
-written in any language. Handler must listen for incoming messages via an http endpoint.
+written in any language. Handler must listen for incoming messages via an http endpoint. Blaster takes care of the complex tasks in message handling such as throttling and retrying so that you can just focus on message handling logic.
+
+This project is currently under heavy churn. We invite all the adventurous folks to give it a whirl and help us make it solid.
+
+Made with ❤ in Australia
 
 ### Usage
 
@@ -34,8 +38,3 @@ Launch the handler with blaster (this should be executed in the directory contai
 ```
 blaster sqs --queue-name "test" --region "ap-southeast-2" --handler-command node --handler-args handler.js
 ```
-
-### Road map
-- Controls to throttle the pump based on various parameters and heuristics (CPU, Memory utilisation)
-
-
