@@ -46,7 +46,7 @@ var sqsCmd = &cobra.Command{
 
 		dispatcher := lib.NewHttpDispatcher(httpHandlerURL)
 		mp := lib.NewMessagePump(sqs, dispatcher, retryCount, time.Second*time.Duration(retryDelaySeconds))
-		return lib.StartTheSystem(mp, handlerName, handlerArgv)
+		return lib.StartTheSystem(mp, handlerCommand, handlerArgv)
 	},
 }
 
