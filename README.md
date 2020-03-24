@@ -37,8 +37,5 @@ blaster sqs --queue-name "test" --region "ap-southeast-2" --handler-command node
 
 ### Road map
 - Controls to throttle the pump based on various parameters and heuristics (CPU, Memory utilisation)
-- Configuration based message routing
-- Improve CLI to launch handler as part of boostrapping
-- All the other crazy stuff...
 
 
