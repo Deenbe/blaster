@@ -32,7 +32,7 @@ app.listen(8312, () => { // Default target URL is http://localhost:8312/
 Launch the handler with blaster (this should be executed in the directory containing node script):
 
 ```
-blaster sqs --queue-name "test" --region "ap-southeast-2" --target "http://localhost:9000/" --handler-name node --handler-args handler.js
+blaster sqs --queue-name "test" --region "ap-southeast-2" --handler-name node --handler-args handler.js
 ```
 
 ### Road map
