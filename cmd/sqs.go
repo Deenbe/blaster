@@ -31,7 +31,7 @@ var sqsCmd = &cobra.Command{
 	Use:   "sqs",
 	Short: "Start a message pump for an AWS sqs backend",
 	Long:  ``,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		config := lib.SQSConfiguration{
 			QueueName:           queueName,
 			MaxNumberOfMessages: maxNumberOfMesages,
@@ -46,7 +46,7 @@ var sqsCmd = &cobra.Command{
 
 		dispatcher := lib.NewHttpDispatcher(httpHandlerURL)
 		mp := lib.NewMessagePump(sqs, dispatcher, retryCount, time.Second*time.Duration(retryDelaySeconds))
-		lib.StartTheSystem(mp)
+		return lib.StartTheSystem(mp)
 	},
 }
 

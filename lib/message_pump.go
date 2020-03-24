@@ -41,8 +41,7 @@ func (p *MessagePump) Start(ctx context.Context) {
 					"module": "message_pump",
 					"error":  ctx.Err(),
 				}).Infof("message_pump: stopped")
-				p.Done <- nil
-				close(p.Done)
+				p.close(nil)
 				return
 			default:
 				p.pumpMain()
@@ -94,11 +93,17 @@ func (p *MessagePump) dispatch(message *Message) {
 	}
 }
 
+func (p *MessagePump) close(err error) {
+	p.Done <- err
+	close(p.Done)
+}
+
 func NewMessagePump(queueReader QueueService, dispatcher Dispatcher, retryCount int, retryDelay time.Duration) *MessagePump {
 	return &MessagePump{queueReader, dispatcher, NewRetryPolicy(retryCount, retryDelay), make(chan error)}
 }
 
-func StartTheSystem(messagePump *MessagePump) {
+func StartTheSystem(messagePump *MessagePump) error {
+	var err error
 	ctx := context.Background()
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
 
@@ -108,10 +113,12 @@ func StartTheSystem(messagePump *MessagePump) {
 	messagePump.Start(cancelCtx)
 
 	select {
-	case <-messagePump.Done:
+	case err = <-messagePump.Done:
 	case <-chanSignal:
 	}
 
 	cancelFunc()
 	<-messagePump.Done
+
+	return err
 }
