@@ -16,6 +16,8 @@ Made with ❤ in Australia
 Handler needs to expose the message handling function as an HTTP API. In this instance, we write a node script to achieve this.
 
 ```javascript
+#!/usr/bin/env node
+
 const express = require('express');
 
 const app = express();
@@ -36,5 +38,5 @@ app.listen(8312, () => { // Default target URL is http://localhost:8312/
 Launch the handler with blaster (this should be executed in the directory containing node script):
 
 ```
-blaster sqs --queue-name "test" --region "ap-southeast-2" --handler-command node --handler-args handler.js
+blaster sqs --queue-name "test" --region "ap-southeast-2" --handler-command ./handler.js
 ```
