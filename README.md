@@ -25,7 +25,7 @@ app.use(express.json());
 
 app.post('/', (req, res) => {
     console.log(req.body);
-    res.write('ok');
+    res.send('ok');
 });
 
 app.listen(8312, () => { // Default target URL is http://localhost:8312/
