@@ -27,7 +27,10 @@ func (d *HttpDispatcher) Dispatch(m *Message) error {
 	defer response.Body.Close()
 	_, err = ioutil.ReadAll(response.Body)
 
-	return err
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	return nil
 }
 
 func NewHttpDispatcher(handlerUrl string) *HttpDispatcher {
