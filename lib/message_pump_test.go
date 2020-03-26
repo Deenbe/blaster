@@ -164,3 +164,33 @@ func TestCancelationWhileWaitingForDispatcherToReturn(t *testing.T) {
 	cancelFunc()
 	<-p.Done
 }
+
+func TestPoisoning(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	q := NewMockQueueService(ctrl)
+	m1 := &Message{MessageID: "m1"}
+	q.EXPECT().Read().Return([]*Message{m1}, nil)
+	q.EXPECT().Read().Return([]*Message{}, nil).AnyTimes()
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	q.EXPECT().Poison(m1).DoAndReturn(func(m *Message) error {
+		wg.Done()
+		return nil
+	})
+
+	d := NewMockDispatcher(ctrl)
+	d.EXPECT().Dispatch(gomock.Any()).DoAndReturn(func(m *Message) error {
+		return errors.New("doh")
+	}).AnyTimes()
+
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	p := NewMessagePump(q, d, 0, time.Second, 1)
+	p.Start(ctx)
+	wg.Wait()
+
+	cancelFunc()
+	<-p.Done
+}
