@@ -47,7 +47,7 @@ func (p *MessagePump) Start(ctx context.Context) {
 		buffer := []*Message{}
 		for {
 			// First we need to fill the buffer with some messages.
-			// We use buffer length to indicate whether we have messages
+			// Use buffer length to indicate whether we have messages
 			// read during the previous iteration but not yet dispatched due
 			// to MaxHandlers limit.
 			if len(buffer) == 0 {
