@@ -41,7 +41,7 @@ blaster sqs --queue-name "test" --region "ap-southeast-2" --handler-command ./ha
 
 ## Road map
 
-Currently blaster supports AWS SQS. Following brokers support is under development.
+Currently blaster supports AWS SQS. Following broker support is under development.
 
 - Kafka
 - Rabbit MQ
