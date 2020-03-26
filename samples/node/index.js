@@ -7,14 +7,10 @@ app.use(express.json());
 
 app.post('/', (req, res) => {
     console.log(`${req.body.messageId}: ${req.body.body}`);
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            res.send('ok');
-            resolve();
-        }, 2000);
-    });
+    return res.send('ok');
 });
 
+// By default blaster forwards messages to http://localhost:8312
 app.listen(8312, () => {
     console.log('listening');
 });
