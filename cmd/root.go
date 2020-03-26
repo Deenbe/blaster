@@ -64,7 +64,7 @@ func init() {
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	rootCmd.PersistentFlags().StringVar(&handlerCommand, "handler-command", "", "name of handler command")
 	rootCmd.PersistentFlags().StringSliceVar(&handlerArgv, "handler-args", nil, "arguments to handler")
-	rootCmd.PersistentFlags().IntVar(&maxHandlers, "max-handlers", 0, "arguments to handler")
+	rootCmd.PersistentFlags().IntVar(&maxHandlers, "max-handlers", 0, "max number of concurrent handlers")
 	sqsCmd.Flags().UintVarP(&handlerPort, "handler-port", "p", 8312, "local port handler is listening on")
 	rootCmd.MarkPersistentFlagRequired("handler-command")
 }
