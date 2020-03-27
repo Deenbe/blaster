@@ -47,7 +47,7 @@ var sqsCmd = &cobra.Command{
 
 		dispatcher := lib.NewHttpDispatcher(fmt.Sprintf("http://localhost:%d/", handlerPort))
 		mp := lib.NewMessagePump(sqs, dispatcher, retryCount, time.Second*time.Duration(retryDelaySeconds), maxHandlers)
-		return lib.StartTheSystem(mp, handlerCommand, handlerArgv)
+		return lib.StartTheSystem(mp, handlerCommand, handlerArgv, enableVerboseLog)
 	},
 }
 

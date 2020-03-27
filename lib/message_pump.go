@@ -59,7 +59,7 @@ func (p *MessagePump) Start(ctx context.Context) {
 						"error":  err,
 					}).Info("message_pump: failed to read from queue")
 				} else {
-					log.Infof("messge_pump: received %d messages", len(buffer))
+					log.Debugf("messge_pump: received %d messages", len(buffer))
 				}
 			}
 
@@ -153,7 +153,11 @@ func NewMessagePump(queueReader QueueService, dispatcher Dispatcher, retryCount 
 	}
 }
 
-func StartTheSystem(messagePump *MessagePump, handlerName string, handlerArgv []string) error {
+func StartTheSystem(messagePump *MessagePump, handlerName string, handlerArgv []string, verboseLogging bool) error {
+	if verboseLogging {
+		log.SetLevel(log.DebugLevel)
+	}
+
 	var err error
 	ctx := context.Background()
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
