@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"time"
 )
 
 type HandlerManager struct {
@@ -12,7 +13,7 @@ type HandlerManager struct {
 	Done    chan error
 }
 
-func (h *HandlerManager) Start(ctx context.Context) {
+func (h *HandlerManager) Start(ctx context.Context, delay time.Duration) {
 	go func() {
 		cmd := exec.CommandContext(ctx, h.Command, h.Argv...)
 		cmd.Stdin = os.Stdin
@@ -21,6 +22,10 @@ func (h *HandlerManager) Start(ctx context.Context) {
 		h.Done <- cmd.Run()
 		close(h.Done)
 	}()
+	// We give 5 seconds for the handler to start although this is
+	// not very reliable.
+	// TODO: Change this to probe a readiness endpoint in the target process
+	time.Sleep(delay)
 }
 
 func NewHandlerManager(command string, argv []string) *HandlerManager {

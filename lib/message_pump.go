@@ -169,7 +169,7 @@ func StartTheSystem(messagePump *MessagePump, handlerName string, handlerArgv []
 	messagePump.Start(cancelCtx)
 
 	h := NewHandlerManager(handlerName, handlerArgv)
-	h.Start(cancelCtx)
+	h.Start(cancelCtx, time.Second * 5)
 
 	select {
 	case err = <-messagePump.Done:
