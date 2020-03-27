@@ -163,13 +163,13 @@ func StartTheSystem(messagePump *MessagePump, handlerName string, handlerArgv []
 	ctx := context.Background()
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
 
+	h := NewHandlerManager(handlerName, handlerArgv)
+	h.Start(cancelCtx, time.Second*5)
+
 	chanSignal := make(chan os.Signal, 1)
 	signal.Notify(chanSignal, os.Interrupt)
 
 	messagePump.Start(cancelCtx)
-
-	h := NewHandlerManager(handlerName, handlerArgv)
-	h.Start(cancelCtx, time.Second * 5)
 
 	select {
 	case err = <-messagePump.Done:
