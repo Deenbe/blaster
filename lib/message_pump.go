@@ -54,10 +54,7 @@ func (p *MessagePump) Start(ctx context.Context) {
 				var err error
 				buffer, err = p.QueueService.Read()
 				if err != nil {
-					log.WithFields(log.Fields{
-						"module": "message_pump",
-						"error":  err,
-					}).Info("message_pump: failed to read from queue")
+					log.WithFields(log.Fields{"module": "message_pump", "error": err}).Info("message_pump: failed to read from queue")
 				} else {
 					log.Debugf("messge_pump: received %d messages", len(buffer))
 				}
@@ -131,10 +128,7 @@ func (p *MessagePump) dispatch(message *Message) {
 }
 
 func (p *MessagePump) close(err error) {
-	log.WithFields(log.Fields{
-		"module": "message_pump",
-		"error":  err,
-	}).Infof("message_pump: stopped")
+	log.WithFields(log.Fields{"module": "message_pump", "error": err}).Infof("message_pump: stopped")
 	p.Done <- err
 	close(p.Done)
 }
