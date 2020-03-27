@@ -70,7 +70,7 @@ func (p *MessagePump) Start(ctx context.Context) {
 			for _, m := range buffer[:numberOfMessagesToDispatch] {
 				// TODO: Propagate ctx so that these go rotines
 				// can be notified of cancellation
-				go p.dispatch(m)
+				go p.dispatch(m, NewStopwatch())
 			}
 
 			buffer = buffer[numberOfMessagesToDispatch:]
@@ -102,16 +102,22 @@ func (p *MessagePump) Start(ctx context.Context) {
 	}()
 }
 
-func (p *MessagePump) dispatch(message *Message) {
-	defer func() { p.DispatchDone <- struct{}{} }()
+func (p *MessagePump) dispatch(message *Message, sw *Stopwatch) {
+	defer func() {
+		p.DispatchDone <- struct{}{}
+		log.WithFields(log.Fields{"messageId": message.MessageID, "duration": sw.Total(), "duration_parts": sw.Laps}).Info("dispatched")
+	}()
 
+	sw.Lap("scheduled")
 	e := p.RetryPolicy.Execute(func() error {
 		return p.Dispatcher.Dispatch(message)
 	}, "dispatch message %s", message.MessageID)
 
+	sw.Lap("handler-invoked")
 	if e != nil {
 		log.Infof("message_pump: failed to dispatch message %s\n", message.MessageID)
 		e = p.QueueService.Poison(message)
+		sw.Lap("poisoned")
 		if e != nil {
 			log.Infof("message_pump: failed to poison message %s\n", message.MessageID)
 		}
@@ -122,6 +128,7 @@ func (p *MessagePump) dispatch(message *Message) {
 		return p.QueueService.Delete(message)
 	}, "delete message %s", message.MessageID)
 
+	sw.Lap("deleted")
 	if e != nil {
 		log.Infof("message_pump: failed to delete message %s\n", message.MessageID)
 	}
