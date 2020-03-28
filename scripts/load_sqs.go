@@ -40,7 +40,7 @@ func main() {
 		go func(s *session.Session, batchNo int) {
 			svc := sqs.New(s)
 			urlResult, err := svc.GetQueueUrl(&sqs.GetQueueUrlInput{
-				QueueName: aws.String("fc-poc"),
+				QueueName: aws.String(queue),
 			})
 			if err != nil {
 				panic(err)
