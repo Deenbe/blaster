@@ -7,4 +7,4 @@ COPY *.js *.json /usr/local/handler/
 
 RUN npm install
 
-ENTRYPOINT ["blaster", "sqs" "--handler-command" "./index.js"]
+ENTRYPOINT ["blaster", "sqs", "--handler-command", "./index.js"]
