@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -30,6 +31,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	for {
+		load()
+	}
+}
+
+func load() {
 	wg := sync.WaitGroup{}
 	for t := 0; t < 100; t++ {
 		ses := session.Must(session.NewSession(&aws.Config{
@@ -43,7 +50,9 @@ func main() {
 				QueueName: aws.String(queue),
 			})
 			if err != nil {
-				panic(err)
+				println(err)
+				println("healing...")
+				time.Sleep(time.Second * 5)
 			}
 			batch := &sqs.SendMessageBatchInput{
 				QueueUrl: urlResult.QueueUrl,
@@ -52,18 +61,21 @@ func main() {
 			buff := make([]byte, 16)
 			for i := 0; i < 10; i++ {
 				rand.Read(buff)
+				data := hex.EncodeToString(buff)
 				batch.Entries = append(batch.Entries, &sqs.SendMessageBatchRequestEntry{
-					Id:          aws.String(hex.EncodeToString(buff)),
-					MessageBody: aws.String(fmt.Sprintf("hey %d", i)),
+					Id:          aws.String(data),
+					MessageBody: aws.String(fmt.Sprintf("hey %s", data)),
 				})
 			}
 			_, err = svc.SendMessageBatch(batch)
 			if err != nil {
-				panic(err)
+				println(err)
+				println("healing...")
+				time.Sleep(time.Second * 5)
 			}
 			wg.Done()
 			fmt.Printf("completed batch %d\n", batchNo)
-		}(ses, t)
+		}(ses, t+1)
 	}
 	wg.Wait()
 }
