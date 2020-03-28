@@ -44,10 +44,11 @@ var sqsCmd = &cobra.Command{
 		if err != nil {
 			panic(err)
 		}
-
-		dispatcher := lib.NewHttpDispatcher(fmt.Sprintf("http://localhost:%d/", handlerPort))
+		handlerURL := fmt.Sprintf("http://localhost:%d/", handlerPort)
+		dispatcher := lib.NewHttpDispatcher(handlerURL)
 		mp := lib.NewMessagePump(sqs, dispatcher, retryCount, time.Second*time.Duration(retryDelaySeconds), maxHandlers)
-		return lib.StartTheSystem(mp, handlerCommand, handlerArgv, enableVerboseLog)
+		hm := lib.NewHandlerManager(handlerCommand, handlerArgv, handlerURL, startupDelaySeconds)
+		return lib.StartTheSystem(mp, hm, enableVerboseLog)
 	},
 }
 

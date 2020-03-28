@@ -154,7 +154,7 @@ func NewMessagePump(queueReader QueueService, dispatcher Dispatcher, retryCount 
 	}
 }
 
-func StartTheSystem(messagePump *MessagePump, handlerName string, handlerArgv []string, verboseLogging bool) error {
+func StartTheSystem(messagePump *MessagePump, handlerManager *HandlerManager, verboseLogging bool) error {
 	if verboseLogging {
 		log.SetLevel(log.DebugLevel)
 	}
@@ -163,8 +163,7 @@ func StartTheSystem(messagePump *MessagePump, handlerName string, handlerArgv []
 	ctx := context.Background()
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
 
-	h := NewHandlerManager(handlerName, handlerArgv)
-	h.Start(cancelCtx, time.Second*5)
+	handlerManager.Start(cancelCtx)
 
 	chanSignal := make(chan os.Signal, 1)
 	signal.Notify(chanSignal, os.Interrupt)
@@ -173,13 +172,13 @@ func StartTheSystem(messagePump *MessagePump, handlerName string, handlerArgv []
 
 	select {
 	case err = <-messagePump.Done:
-	case err = <-h.Done:
+	case err = <-handlerManager.Done:
 	case <-chanSignal:
 	}
 
 	cancelFunc()
 	<-messagePump.Done
-	<-h.Done
+	<-handlerManager.Done
 
 	return err
 }

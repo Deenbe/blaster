@@ -31,6 +31,7 @@ var handlerArgv []string
 var handlerPort uint
 var maxHandlers int
 var enableVerboseLog bool
+var startupDelaySeconds int
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -66,6 +67,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&handlerCommand, "handler-command", "", "name of handler command")
 	rootCmd.PersistentFlags().StringSliceVar(&handlerArgv, "handler-args", nil, "arguments to handler")
 	rootCmd.PersistentFlags().IntVar(&maxHandlers, "max-handlers", 0, "max number of concurrent handlers")
+	rootCmd.PersistentFlags().IntVar(&startupDelaySeconds, "startup-delay-seconds", 5, "number of seconds to wait on start")
 	rootCmd.PersistentFlags().BoolVarP(&enableVerboseLog, "verbose", "v", false, "enable verbose logging")
 	sqsCmd.Flags().UintVarP(&handlerPort, "handler-port", "p", 8312, "local port handler is listening on")
 	rootCmd.MarkPersistentFlagRequired("handler-command")
