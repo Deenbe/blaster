@@ -3,6 +3,7 @@ package lib
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
@@ -25,10 +26,14 @@ func (d *HttpDispatcher) Dispatch(m *Message) error {
 	}
 
 	defer response.Body.Close()
-	_, err = ioutil.ReadAll(response.Body)
+	body, err := ioutil.ReadAll(response.Body)
 
 	if err != nil {
 		return errors.WithStack(err)
+	}
+
+	if response.StatusCode != 200 {
+		return errors.WithStack(errors.New(fmt.Sprintf("error response from handler %d: %s", response.StatusCode, string(body))))
 	}
 	return nil
 }
