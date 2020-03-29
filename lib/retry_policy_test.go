@@ -38,7 +38,7 @@ func TestRetryAndSuccess(t *testing.T) {
 func TestRetryAndFail(t *testing.T) {
 	count := 0
 	p := NewRetryPolicy(1, time.Microsecond)
-	err := p.Execute(func () error {
+	err := p.Execute(func() error {
 		count = count + 1
 		return errors.New("doh")
 	}, "test")
