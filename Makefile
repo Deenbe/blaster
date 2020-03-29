@@ -7,7 +7,7 @@ TARGET=_$(SUFFIX)
 endif
 
 build:
-	CGO_ENABLED=0 go build -o "./build/blaster${TARGET}"
+	CGO_ENABLED=0 go build -o "./build/blaster${TARGET}${EXTENSION}"
 
 clean:
 	rm -rf ./build
