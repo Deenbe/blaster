@@ -27,7 +27,7 @@ var versionCmd = &cobra.Command{
 	Short: "Show blaster version",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("0.1.17")
+		fmt.Println("0.1.18")
 	},
 }
 
