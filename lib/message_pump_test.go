@@ -18,14 +18,18 @@ func TestBasicMessageDispatch(t *testing.T) {
 
 	q := NewMockQueueService(ctrl)
 	m := &Message{}
+	events := make(chan string)
 	q.EXPECT().Read().Return([]*Message{m}, nil)
 	q.EXPECT().Read().Return([]*Message{}, nil).AnyTimes()
-	q.EXPECT().Delete(m).Return(nil)
+	q.EXPECT().Delete(m).DoAndReturn(func(m *Message) error {
+		events <- "deleted"
+		close(events)
+		return nil
+	})
 
 	d := NewMockDispatcher(ctrl)
-	observe := make(chan *Message)
-	d.EXPECT().Dispatch(gomock.Any()).Do(func(m *Message) error {
-		observe <- m
+	d.EXPECT().Dispatch(m).Do(func(m *Message) error {
+		events <- "dispatched"
 		return nil
 	})
 
@@ -33,7 +37,11 @@ func TestBasicMessageDispatch(t *testing.T) {
 	p := NewMessagePump(q, d, 0, time.Second, 0)
 	p.Start(ctx)
 
-	assert.Equal(t, m, <-observe)
+	expectedEvents := []string{"dispatched", "deleted"}
+	for e := range events {
+		assert.Equal(t, expectedEvents[0], e)
+		expectedEvents = expectedEvents[1:]
+	}
 
 	cancelFunc()
 	<-p.Done
