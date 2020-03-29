@@ -28,10 +28,12 @@ import (
 var cfgFile string
 var handlerCommand string
 var handlerArgv []string
-var handlerPort uint
+var handlerURL string
 var maxHandlers int
 var enableVerboseLog bool
 var startupDelaySeconds int
+var retryDelaySeconds uint
+var retryCount int
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -63,13 +65,14 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	rootCmd.PersistentFlags().StringVar(&handlerCommand, "handler-command", "", "name of handler command")
 	rootCmd.PersistentFlags().StringSliceVar(&handlerArgv, "handler-args", nil, "arguments to handler")
 	rootCmd.PersistentFlags().IntVar(&maxHandlers, "max-handlers", 0, "max number of concurrent handlers")
 	rootCmd.PersistentFlags().IntVar(&startupDelaySeconds, "startup-delay-seconds", 5, "number of seconds to wait on start")
 	rootCmd.PersistentFlags().BoolVarP(&enableVerboseLog, "verbose", "v", false, "enable verbose logging")
-	sqsCmd.Flags().UintVarP(&handlerPort, "handler-port", "p", 8312, "local port handler is listening on")
+	rootCmd.PersistentFlags().StringVar(&handlerURL, "handler-url", "http://localhost:8312/", "handler endpoint url")
+	rootCmd.PersistentFlags().IntVarP(&retryCount, "retry-count", "c", 0, "number of retry attempts")
+	rootCmd.PersistentFlags().UintVarP(&retryDelaySeconds, "retry-delay-seconds", "d", 1, "delay between retry attempts")
 	rootCmd.MarkPersistentFlagRequired("handler-command")
 }
 
