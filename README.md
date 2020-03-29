@@ -98,4 +98,27 @@ Maximum number of messages to receive in a single poll from SQS. Default setting
 
 Blaster uses long polling when receiving messages from SQS. Use this option to control the delay between polls. Default setting is 1.
 
+## Supported Brokers
+
+- AWS SQS
+
+## Contributing
+
+```
+git clone https://github.com/buddyspike/blaster
+cd blaster
+
+# Run tests
+make test
+
+# Build binary
+make build
+
+# Build binary and copy it to path
+make build-local
+
+# Build cross compiled binaries
+./build.sh
+```
+
 <sub><sup>Made in Australia with ❤ <sub><sup>
