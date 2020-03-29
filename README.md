@@ -98,6 +98,34 @@ Maximum number of messages to receive in a single poll from SQS. Default setting
 
 Blaster uses long polling when receiving messages from SQS. Use this option to control the delay between polls. Default setting is 1.
 
+## Message Schema
+
+Since Blaster is designed to work with many different message brokers, it converts the message to a  general purpose format before forwarding it to the handler.
+
+```
+{
+    "$schema": "http://json-schema.org/schema#",
+    "$id": "https://github.com/buddyspike/blaster/message-schema.json",
+    "title": "Message",
+    "type": "object",
+    "properties": {
+        "messageId": {
+            "type": "string",
+            "description": "Unique message id that is generally assigned by the broker"
+        },
+        "body": {
+            "type": "string",
+            "description": "Message body with the content"
+        },
+        "properties": {
+            "type": "object",
+            "description": "Additional information available in the message such as headers"
+        }
+    }
+}
+```
+
+
 ## Supported Brokers
 
 - AWS SQS
