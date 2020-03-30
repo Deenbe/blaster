@@ -16,7 +16,8 @@ limitations under the License.
 package cmd
 
 import (
-	"blaster/lib"
+	"blaster/sqs"
+	"blaster/core"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -32,21 +33,21 @@ var sqsCmd = &cobra.Command{
 	Short: "Start a message pump for an AWS sqs backend",
 	Long:  ``,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		config := lib.SQSConfiguration{
+		config := sqs.SQSConfiguration{
 			QueueName:           queueName,
 			MaxNumberOfMessages: maxNumberOfMesages,
 			WaitTime:            waitTimeSeconds,
 			Region:              region,
 		}
 
-		sqs, err := lib.NewSQSService(&config)
+		sqs, err := sqs.NewSQSService(&config)
 		if err != nil {
 			panic(err)
 		}
-		dispatcher := lib.NewHttpDispatcher(handlerURL)
-		mp := lib.NewMessagePump(sqs, dispatcher, retryCount, time.Second*time.Duration(retryDelaySeconds), maxHandlers)
-		hm := lib.NewHandlerManager(handlerCommand, handlerArgv, handlerURL, startupDelaySeconds)
-		return lib.StartTheSystem(mp, hm, enableVerboseLog)
+		dispatcher := core.NewHttpDispatcher(handlerURL)
+		mp := core.NewMessagePump(sqs, dispatcher, retryCount, time.Second*time.Duration(retryDelaySeconds), maxHandlers)
+		hm := core.NewHandlerManager(handlerCommand, handlerArgv, handlerURL, startupDelaySeconds)
+		return core.StartTheSystem(mp, hm, enableVerboseLog)
 	},
 }
 

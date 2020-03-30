@@ -2,7 +2,7 @@
 // Source: ./lib/message_pump.go
 
 // Package lib is a generated GoMock package.
-package lib
+package core
 
 import (
 	gomock "github.com/golang/mock/gomock"

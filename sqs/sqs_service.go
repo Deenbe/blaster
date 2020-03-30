@@ -1,6 +1,8 @@
-package lib
+package sqs
 
 import (
+	"blaster/core"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
@@ -20,7 +22,7 @@ type SQSService struct {
 	QueueUrl      string
 }
 
-func (s *SQSService) Read() ([]*Message, error) {
+func (s *SQSService) Read() ([]*core.Message, error) {
 	msgs, err := s.Client.ReceiveMessage(&sqs.ReceiveMessageInput{
 		QueueUrl:            &s.QueueUrl,
 		MaxNumberOfMessages: &s.Configuration.MaxNumberOfMessages,
@@ -31,10 +33,10 @@ func (s *SQSService) Read() ([]*Message, error) {
 		return nil, errors.WithStack(err)
 	}
 
-	result := make([]*Message, len(msgs.Messages))
+	result := make([]*core.Message, len(msgs.Messages))
 
 	for i, msg := range msgs.Messages {
-		result[i] = &Message{
+		result[i] = &core.Message{
 			MessageID: *msg.MessageId,
 			Body:      *msg.Body,
 			Properties: map[string]interface{}{
@@ -50,7 +52,7 @@ func (s *SQSService) Read() ([]*Message, error) {
 	return result, nil
 }
 
-func (s *SQSService) Delete(message *Message) error {
+func (s *SQSService) Delete(message *core.Message) error {
 	rh, ok := message.Properties["receiptHandle"].(*string)
 	if !ok {
 		panic("Unexpected input: SQS message without a receipt handle")
@@ -68,7 +70,7 @@ func (s *SQSService) Delete(message *Message) error {
 	return nil
 }
 
-func (s *SQSService) Poison(message *Message) error {
+func (s *SQSService) Poison(message *core.Message) error {
 	return nil
 }
 
