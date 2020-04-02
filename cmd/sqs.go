@@ -29,7 +29,7 @@ var maxNumberOfMesages int64
 // sqsCmd represents the sqs command
 var sqsCmd = &cobra.Command{
 	Use:   "sqs",
-	Short: "Start a message pump for an AWS sqs backend",
+	Short: "Start blaster for an AWS sqs backend",
 	Long:  ``,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		sqsConfig := &sqs.SQSConfiguration{
