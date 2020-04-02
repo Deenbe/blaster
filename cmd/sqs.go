@@ -16,8 +16,8 @@ limitations under the License.
 package cmd
 
 import (
-	"blaster/sqs"
 	"blaster/core"
+	"blaster/sqs"
 
 	"github.com/spf13/cobra"
 )
