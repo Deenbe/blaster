@@ -2,7 +2,9 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"time"
@@ -15,17 +17,27 @@ type HandlerManager struct {
 	Argv         []string
 	StartupDelay time.Duration
 	HandlerURL   string
-	Done         chan error
+	done         chan error
 }
 
 func (h *HandlerManager) Start(ctx context.Context) {
 	go func() {
+		url, err := url.Parse(h.HandlerURL)
+		if err != nil {
+			h.close(err)
+			return
+		}
 		cmd := exec.CommandContext(ctx, h.Command, h.Argv...)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
-		h.Done <- cmd.Run()
-		close(h.Done)
+		cmd.Env = os.Environ()
+		cmd.Env = append(cmd.Env, fmt.Sprintf("BLASTER_HANDLER_PORT=%v", url.Port()))
+		err = cmd.Run()
+		if err != nil {
+			log.WithFields(log.Fields{"module": "handler_manager", "err": err}).Info("error handler process existed")
+		}
+		h.close(err)
 	}()
 
 	if h.StartupDelay != 0 {
@@ -60,12 +72,21 @@ func (h *HandlerManager) Start(ctx context.Context) {
 	log.WithFields(log.Fields{"module": "handler_manager"}).Warn("handler readiness is inconclusive")
 }
 
+func (h *HandlerManager) Done() <-chan error {
+	return h.done
+}
+
+func (h *HandlerManager) close(err error) {
+	h.done <- err
+	close(h.done)
+}
+
 func NewHandlerManager(command string, argv []string, handlerURL string, startupDelaySeconds int) *HandlerManager {
 	return &HandlerManager{
 		Command:      command,
 		Argv:         argv,
-		Done:         make(chan error),
 		HandlerURL:   handlerURL,
 		StartupDelay: time.Second * time.Duration(startupDelaySeconds),
+		done:         make(chan error),
 	}
 }

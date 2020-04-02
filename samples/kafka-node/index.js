@@ -6,7 +6,7 @@ const app = express();
 app.use(express.json());
 
 app.post('/', (req, res) => {
-    console.log(`${req.body.messageId}: ${req.body.body}`);
+    console.log(`pid: ${process.pid} partion: ${req.body.properties.partitionId} offset: ${req.body.properties.offset} messageId: ${req.body.messageId}: ${req.body.body}`);
     return res.send('ok');
 });
 

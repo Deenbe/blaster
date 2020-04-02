@@ -2,6 +2,7 @@ package sqs
 
 import (
 	"blaster/core"
+	"context"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -92,4 +93,48 @@ func NewSQSService(configuration *SQSConfiguration) (*SQSService, error) {
 		Client:        svc,
 		QueueUrl:      *urlResult.QueueUrl,
 	}, nil
+}
+
+type SQSBinding struct {
+	SQSConfiguration *SQSConfiguration
+	Config           *core.Config
+	MessagePump      *core.MessagePump
+	HandlerManager   *core.HandlerManager
+	done             chan error
+}
+
+func (b *SQSBinding) Start(ctx context.Context) {
+	go func() {
+		b.HandlerManager.Start(ctx)
+		b.MessagePump.Start(ctx)
+
+		select {
+		case b.done <- <-b.MessagePump.Done():
+		case b.done <- <-b.HandlerManager.Done():
+		}
+		<-b.MessagePump.Done()
+		<-b.HandlerManager.Done()
+		close(b.done)
+	}()
+}
+
+func (b *SQSBinding) Done() <-chan error {
+	return b.done
+}
+
+func NewSQSBinding(sqsConfig *SQSConfiguration, config *core.Config) *SQSBinding {
+	sqs, err := NewSQSService(sqsConfig)
+	if err != nil {
+		panic(err)
+	}
+	dispatcher := core.NewHttpDispatcher(config.HandlerURL)
+	mp := core.NewMessagePump(sqs, dispatcher, config.RetryCount, config.RetryDelay, config.MaxHandlers)
+	hm := core.NewHandlerManager(config.HandlerCommand, config.HandlerArgs, config.HandlerURL, config.StartupDelaySeconds)
+	return &SQSBinding{
+		SQSConfiguration: sqsConfig,
+		Config:           config,
+		MessagePump:      mp,
+		HandlerManager:   hm,
+		done:             make(chan error),
+	}
 }

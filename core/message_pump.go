@@ -2,8 +2,6 @@ package core
 
 import (
 	"context"
-	"os"
-	"os/signal"
 	"runtime"
 	"time"
 
@@ -26,11 +24,31 @@ type Dispatcher interface {
 	Dispatch(*Message) error
 }
 
+// BrokerBinding is how we glue the machinery of message
+// pump and handler manager integration to a particular broker
+// with rest of the system.
+type BrokerBinding interface {
+	Start(context.Context)
+	Done() <-chan error
+}
+
+// Config of common knobs.
+type Config struct {
+	RetryCount          int
+	RetryDelay          time.Duration
+	MaxHandlers         int
+	HandlerURL          string
+	HandlerCommand      string
+	HandlerArgs         []string
+	StartupDelaySeconds int
+	EnableVersboseLog   bool
+}
+
 type MessagePump struct {
 	QueueService QueueService
 	Dispatcher   Dispatcher
 	RetryPolicy  *RetryPolicy
-	Done         chan error
+	done         chan error
 	MaxHandlers  int
 	DispatchDone chan struct{}
 }
@@ -134,10 +152,14 @@ func (p *MessagePump) dispatch(message *Message, sw *Stopwatch) {
 	}
 }
 
+func (p *MessagePump) Done() <-chan error {
+	return p.done
+}
+
 func (p *MessagePump) close(err error) {
 	log.WithFields(log.Fields{"module": "message_pump", "error": err}).Infof("message_pump: stopped")
-	p.Done <- err
-	close(p.Done)
+	p.done <- err
+	close(p.done)
 }
 
 func NewMessagePump(queueReader QueueService, dispatcher Dispatcher, retryCount int, retryDelay time.Duration, maxHandlers int) *MessagePump {
@@ -148,37 +170,8 @@ func NewMessagePump(queueReader QueueService, dispatcher Dispatcher, retryCount 
 		QueueService: queueReader,
 		Dispatcher:   dispatcher,
 		RetryPolicy:  NewRetryPolicy(retryCount, retryDelay),
-		Done:         make(chan error),
 		DispatchDone: make(chan struct{}, maxHandlers),
 		MaxHandlers:  maxHandlers,
+		done:         make(chan error),
 	}
-}
-
-func StartTheSystem(messagePump *MessagePump, handlerManager *HandlerManager, verboseLogging bool) error {
-	if verboseLogging {
-		log.SetLevel(log.DebugLevel)
-	}
-
-	var err error
-	ctx := context.Background()
-	cancelCtx, cancelFunc := context.WithCancel(ctx)
-
-	handlerManager.Start(cancelCtx)
-
-	chanSignal := make(chan os.Signal, 1)
-	signal.Notify(chanSignal, os.Interrupt)
-
-	messagePump.Start(cancelCtx)
-
-	select {
-	case err = <-messagePump.Done:
-	case err = <-handlerManager.Done:
-	case <-chanSignal:
-	}
-
-	cancelFunc()
-	<-messagePump.Done
-	<-handlerManager.Done
-
-	return err
 }

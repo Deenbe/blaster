@@ -1,4 +1,4 @@
-.PHONY: build clean build-local test
+.PHONY: build clean install test
 
 TARGET=
 SUFFIX=$(GOOS)_$(GOARCH)
@@ -15,5 +15,5 @@ clean:
 test: build
 	CGO_ENABLED=0 go test -covermode=count -coverpkg="blaster,blaster/lib,blaster/cmd" -coverprofile=build/cover.out ./...
 
-build-local: build
+install: build
 	cp "./build/blaster${TARGET}" /usr/local/bin/

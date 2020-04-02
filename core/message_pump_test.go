@@ -44,7 +44,7 @@ func TestBasicMessageDispatch(t *testing.T) {
 	}
 
 	cancelFunc()
-	<-p.Done
+	<-p.Done()
 }
 
 func TestMaxMessageHandlersWithoutBuffering(t *testing.T) {
@@ -170,7 +170,7 @@ func TestCancelationWhileWaitingForDispatcherToReturn(t *testing.T) {
 	p.Start(ctx)
 
 	cancelFunc()
-	<-p.Done
+	<-p.Done()
 }
 
 func TestPoisoning(t *testing.T) {
@@ -200,5 +200,5 @@ func TestPoisoning(t *testing.T) {
 	wg.Wait()
 
 	cancelFunc()
-	<-p.Done
+	<-p.Done()
 }

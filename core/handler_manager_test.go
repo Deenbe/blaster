@@ -20,7 +20,7 @@ func TestExecution(t *testing.T) {
 
 	h := NewHandlerManager("echo", []string{"hey"}, HandlerURL, 0)
 	h.Start(context.Background())
-	err := <-h.Done
+	err := <-h.Done()
 	assert.NoError(t, err)
 }
 
@@ -36,7 +36,7 @@ func TestCancelleation(t *testing.T) {
 	h := NewHandlerManager("sleep", []string{"10"}, HandlerURL, 0)
 	h.Start(ctx)
 	cancelFunc()
-	err := <-h.Done
+	err := <-h.Done()
 	assert.Error(t, err, "context canceled")
 }
 

@@ -18,7 +18,6 @@ package cmd
 import (
 	"blaster/sqs"
 	"blaster/core"
-	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -33,21 +32,16 @@ var sqsCmd = &cobra.Command{
 	Short: "Start a message pump for an AWS sqs backend",
 	Long:  ``,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		config := sqs.SQSConfiguration{
+		sqsConfig := &sqs.SQSConfiguration{
 			QueueName:           queueName,
 			MaxNumberOfMessages: maxNumberOfMesages,
 			WaitTime:            waitTimeSeconds,
 			Region:              region,
 		}
 
-		sqs, err := sqs.NewSQSService(&config)
-		if err != nil {
-			panic(err)
-		}
-		dispatcher := core.NewHttpDispatcher(handlerURL)
-		mp := core.NewMessagePump(sqs, dispatcher, retryCount, time.Second*time.Duration(retryDelaySeconds), maxHandlers)
-		hm := core.NewHandlerManager(handlerCommand, handlerArgv, handlerURL, startupDelaySeconds)
-		return core.StartTheSystem(mp, hm, enableVerboseLog)
+		config := GetConfig()
+		binding := sqs.NewSQSBinding(sqsConfig, config)
+		return core.RunCLIInstance(binding, config)
 	},
 }
 
