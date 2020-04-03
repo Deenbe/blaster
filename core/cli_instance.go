@@ -20,7 +20,7 @@ func RunCLIInstance(binding BrokerBinding, config *Config) error {
 	chanSignal := make(chan os.Signal, 1)
 	signal.Notify(chanSignal, os.Interrupt)
 
-	go binding.Start(cancelCtx)
+	binding.Start(cancelCtx)
 
 	select {
 	case err = <-binding.Done():
