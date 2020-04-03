@@ -56,6 +56,7 @@ type PartionHandler struct {
 	KafkaService   *KafkaService
 	MessagePump    *core.MessagePump
 	HandlerManager *core.HandlerManager
+	Started        bool
 }
 
 func (h *PartionHandler) Start(ctx context.Context) {
@@ -102,6 +103,9 @@ func (h *SaramaConsumerGroupHandler) Cleanup(session sarama.ConsumerGroupSession
 	defer h.Mutex.Unlock()
 
 	for _, v := range h.PartionHandlers {
+		if !v.Started {
+			v.KafkaService.Close()
+		}
 		<-v.HandlerManager.Done()
 		<-v.MessagePump.Done()
 	}
@@ -116,6 +120,7 @@ func (h *SaramaConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSe
 	if !ok {
 		return errors.WithStack(errors.New("unable to consume a claim with an unclaimed partion"))
 	}
+	p.Started = true
 	h.Mutex.Unlock()
 
 	// Loop until the messages channel is open or
@@ -125,26 +130,23 @@ func (h *SaramaConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSe
 	// session. Since session's context is associated
 	// with both MessagePump and HandlerManager, this
 	// should gracefully shutdown all components.
-loop:
-	for {
+ReceiveLoop:
+	for msg := range claim.Messages() {
+		m := &core.Message{
+			MessageID:  string(msg.Key),
+			Body:       string(msg.Value),
+			Properties: make(map[string]interface{}),
+		}
+		m.Properties["timestamp"] = msg.Timestamp
+		m.Properties["partitionId"] = msg.Partition
+		m.Properties["offset"] = msg.Offset
+
 		select {
-		case msg, ok := <-claim.Messages():
-			if !ok {
-				break loop
-			}
-			m := &core.Message{
-				MessageID:  string(msg.Key),
-				Body:       string(msg.Value),
-				Properties: make(map[string]interface{}),
-			}
-			m.Properties["timestamp"] = msg.Timestamp
-			m.Properties["partitionId"] = msg.Partition
-			m.Properties["offset"] = msg.Offset
-			p.KafkaService.Messages() <- m
+		case p.KafkaService.Messages() <- m:
 		case <-p.HandlerManager.Done():
-			break loop
+			break ReceiveLoop
 		case <-p.MessagePump.Done():
-			break loop
+			break ReceiveLoop
 		}
 	}
 	p.KafkaService.Close()
