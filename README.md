@@ -1,3 +1,5 @@
+![blaster](assets/blaster.png)
+
 # Blaster
 > Got a message? Just handle it!
 
@@ -148,5 +150,9 @@ make build-local
 # Build cross compiled binaries
 ./build.sh
 ```
+
+## Credits
+
+- Icons made by <a href="https://www.flaticon.com/authors/nikita-golubev" title="Nikita Golubev">Nikita Golubev</a> from <a href="https://www.flaticon.com/" title="Flaticon"> www.flaticon.com</a>
 
 <sub><sup>Made in Australia with ❤ <sub><sup>
