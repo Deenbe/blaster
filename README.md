@@ -1,4 +1,4 @@
-![blaster](assets/blaster.png)
+![blaster](assets/blaster-128.png)
 
 # Blaster
 > Got a message? Just handle it!
