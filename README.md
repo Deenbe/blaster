@@ -1,17 +1,42 @@
 ![blaster](assets/blaster-128.png)
 
 # Blaster
-> Got a message? Just handle it!
+> A reliable message processing pipeline
 
 [![Build Status](https://travis-ci.org/buddyspike/blaster.svg?branch=master)](https://travis-ci.org/buddyspike/blaster) [![codecov](https://codecov.io/gh/buddyspike/blaster/branch/master/graph/badge.svg)](https://codecov.io/gh/buddyspike/blaster) [![Go Report Card](https://goreportcard.com/badge/github.com/buddyspike/blaster)](https://goreportcard.com/report/github.com/buddyspike/blaster)
 
 Blaster is a utility to read messages from a message broker and forward them to a message handler over a local http endpoint. Handlers focus on the application logic while Blaster takes care of the complex tasks like parallel execution, throttling and retrying.
 
+## Table of Contents
+
+- [Introduction](#Introduction) 
+- [Example](#Example)
+- [Usage](#Usage)
+   * [Global Options](#Global-Options)
+   * [Broker Options](#Broker-Options)
+     - [SQS](#SQS)
+     - [Kafka](#Kafka)
+- [Message Schema](#Message-Schema)
+- [Contributing](#Contributing)
+- [Credits](#Credits)
+
+## Introduction
+A typical workflow to consume messages in a message queue is; fetch one message, process, remove and repeat. This seemingly straightforward process however is often convoluted by the logic required to deal with subtleties in message processing. Following list summarises some of the common complexities without being too exhaustive. 
+
+- Batch retrieval 
+- Error handling and retrying
+- Circuit breakers
+- Parallel processing of multiple messages
+- Throttling the maximum number of in-flight messages
+- Avoid starvation (i.e. Avoid buffering messages in internal local queues of busy processes)
+
+Blaster simplifies the message handling code by providing a flexible message processing pipeline with built-in features to deal with the well-known complexities. 
+
 ## Example
 
 **Step 1: Write a handler**
 
-This example uses a script written in javascript to build the message handler.
+Blaster message handler is any executable exposing the message handling logic as an HTTP endpoint. In this example, it is a script written in Javascript.
 
 ```javascript
 #!/usr/bin/env node
@@ -21,20 +46,20 @@ const express = require('express');
 const app = express();
 app.use(express.json());
 
+// Messages are submitted to the root as
+// HTTP POST requests
 app.post('/', (req, res) => {
     console.log(req.body);
     res.send('ok');
 });
 
 // By default blaster forwards messages to http://localhost:8312/
-app.listen(8312, () => { 
-    console.log('listening');
-});
+app.listen(8312, () => { console.log('listening'); });
 ```
 
 **Step 2: Launch it with blaster**
 
-Launch the handler with blaster (this should be executed in the directory containing node script):
+Now that we have a message handler, we can launch blaster to handle messages stored in a supported broker. For instance, to process messages in an AWS SQS queue called test with the script created in step 1, launch blaster with following command (this should be executed in the directory containing node script):
 
 ```
 blaster sqs --queue-name "test" --region "ap-southeast-2" --handler-command ./handler.js
@@ -100,6 +125,28 @@ Maximum number of messages to receive in a single poll from SQS. Default setting
 
 Blaster uses long polling when receiving messages from SQS. Use this option to control the delay between polls. Default setting is 1.
 
+#### Kafka
+
+`--brokers`
+
+Comma separated list of broker addresses.
+
+`--topic`
+
+Name of the topic to read messages from.
+
+`--group`
+
+Name of the consumer group. Blaster creates a handler instance for each partition assigned to a member of the consumer group. Each message is sequentially delivered to the handler in the order they are received.
+
+`--start-from-oldest`
+
+Force blaster to start reading the partition from oldest available offset.
+
+`--buffer-size`
+
+Number of messages to be read into the local buffer.
+
 ## Message Schema
 
 Since Blaster is designed to work with many different message brokers, it converts the message to a  general purpose format before forwarding it to the handler.
@@ -127,11 +174,6 @@ Since Blaster is designed to work with many different message brokers, it conver
 }
 ```
 
-
-## Supported Brokers
-
-- AWS SQS
-
 ## Contributing
 
 ```
@@ -145,7 +187,7 @@ make test
 make build
 
 # Build binary and copy it to path
-make build-local
+make install
 
 # Build cross compiled binaries
 ./build.sh
