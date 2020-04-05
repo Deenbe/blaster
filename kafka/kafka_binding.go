@@ -12,8 +12,11 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const DataItemMessage string = "message"
+
 type KafkaService struct {
 	messages chan *core.Message
+	session  sarama.ConsumerGroupSession
 }
 
 func (b *KafkaService) Read() ([]*core.Message, error) {
@@ -29,8 +32,9 @@ func (b *KafkaService) Read() ([]*core.Message, error) {
 }
 
 func (b *KafkaService) Delete(m *core.Message) error {
-	// TODO: Provide granular controls to manipulate
-	// how offset is committed.
+	msg := m.Data[DataItemMessage].(*sarama.ConsumerMessage)
+	// TODO: Consider reading the metadata string from the config
+	b.session.MarkMessage(msg, "")
 	return nil
 }
 
@@ -44,12 +48,6 @@ func (b *KafkaService) Messages() chan<- *core.Message {
 
 func (b *KafkaService) Close() {
 	close(b.messages)
-}
-
-func NewKafkaService() *KafkaService {
-	return &KafkaService{
-		messages: make(chan *core.Message),
-	}
 }
 
 type PartionHandler struct {
@@ -82,7 +80,10 @@ func (h *SaramaConsumerGroupHandler) Setup(session sarama.ConsumerGroupSession) 
 			port := core.GetFreePort()
 			handlerURL := fmt.Sprintf("http://localhost:%d/", port)
 			dispatcher := core.NewHttpDispatcher(handlerURL)
-			qsvc := NewKafkaService()
+			qsvc := &KafkaService{
+				messages: make(chan *core.Message),
+				session:  session,
+			}
 			pump := core.NewMessagePump(qsvc, dispatcher, config.RetryCount, config.RetryDelay, config.MaxHandlers)
 			hm := core.NewHandlerManager(config.HandlerCommand, config.HandlerArgs, handlerURL, config.StartupDelaySeconds)
 			ph := &PartionHandler{
@@ -136,10 +137,12 @@ ReceiveLoop:
 			MessageID:  string(msg.Key),
 			Body:       string(msg.Value),
 			Properties: make(map[string]interface{}),
+			Data:       make(map[string]interface{}),
 		}
 		m.Properties["timestamp"] = msg.Timestamp
 		m.Properties["partitionId"] = msg.Partition
 		m.Properties["offset"] = msg.Offset
+		m.Data["message"] = msg
 
 		select {
 		case p.KafkaService.Messages() <- m:

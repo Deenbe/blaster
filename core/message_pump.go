@@ -12,6 +12,7 @@ type Message struct {
 	MessageID  string                 `json:"messageId"`
 	Body       string                 `json:"body"`
 	Properties map[string]interface{} `json:"properties"`
+	Data       map[string]interface{} `jason:-`
 }
 
 type QueueService interface {
