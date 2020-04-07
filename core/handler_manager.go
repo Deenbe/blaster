@@ -36,9 +36,11 @@ func (h *HandlerManager) Start(ctx context.Context) {
 		cmd.Env = os.Environ()
 		cmd.Env = append(cmd.Env, fmt.Sprintf("BLASTER_HANDLER_PORT=%v", url.Port()))
 		err = cmd.Run()
-		if err != nil {
-			log.WithFields(h.logFields).WithFields(log.Fields{"err": err}).Info("error handler process existed")
+		pid := 0
+		if cmd.Process != nil {
+			pid = cmd.Process.Pid
 		}
+		log.WithFields(h.logFields).WithField("err", err).Infof("handler process (%d) exited", pid)
 		h.awaitNotifier.Notify(err)
 	}()
 
@@ -58,7 +60,7 @@ func (h *HandlerManager) Start(ctx context.Context) {
 		}
 		response, e := http.Get(h.HandlerURL)
 		if e != nil {
-			log.WithFields(h.logFields).WithFields(log.Fields{"error": e}).Infof("probing attempt %d failed", i)
+			log.WithFields(h.logFields).WithField("err", e).Infof("probing attempt %d failed", i)
 			continue
 		}
 		defer response.Body.Close()
@@ -67,7 +69,7 @@ func (h *HandlerManager) Start(ctx context.Context) {
 			return
 		}
 		if response.StatusCode == 404 || response.StatusCode == 501 {
-			log.WithFields(h.logFields).WithFields(log.Fields{"status code": response.StatusCode}).Info("probing endpoint is not available")
+			log.WithFields(h.logFields).WithField("status code", response.StatusCode).Info("probing endpoint is not available")
 			return
 		}
 	}

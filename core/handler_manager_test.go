@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 const HandlerURL string = "http://localhost:8312/"
@@ -33,7 +35,8 @@ func TestCancelleation(t *testing.T) {
 	h := NewHandlerManager("sleep", []string{"10"}, HandlerURL, 0)
 	h.Start(ctx)
 	cancelFunc()
-	h.Awaiter.Err()
+	err := h.Awaiter.Err()
+	assert.EqualError(t, err, "signal: killed")
 }
 
 func createTestHandler(done chan<- struct{}) *http.Server {
