@@ -51,7 +51,7 @@ func (t *KafkaTransporter) Close() {
 }
 
 type PartionHandler struct {
-	KafkaService   *KafkaTransporter
+	Transporter    *KafkaTransporter
 	MessagePump    *core.MessagePump
 	HandlerManager *core.HandlerManager
 	Started        bool
@@ -87,7 +87,7 @@ func (h *SaramaConsumerGroupHandler) Setup(session sarama.ConsumerGroupSession) 
 			pump := core.NewMessagePump(qsvc, dispatcher, config.RetryCount, config.RetryDelay, config.MaxHandlers)
 			hm := core.NewHandlerManager(config.HandlerCommand, config.HandlerArgs, handlerURL, config.StartupDelaySeconds)
 			ph := &PartionHandler{
-				KafkaService:   qsvc,
+				Transporter:    qsvc,
 				MessagePump:    pump,
 				HandlerManager: hm,
 			}
@@ -105,7 +105,7 @@ func (h *SaramaConsumerGroupHandler) Cleanup(session sarama.ConsumerGroupSession
 
 	for _, v := range h.PartionHandlers {
 		if !v.Started {
-			v.KafkaService.Close()
+			v.Transporter.Close()
 		}
 		<-v.HandlerManager.Done()
 		<-v.MessagePump.Done()
@@ -145,14 +145,14 @@ ReceiveLoop:
 		m.Data["message"] = msg
 
 		select {
-		case p.KafkaService.Messages() <- m:
+		case p.Transporter.Messages() <- m:
 		case <-p.HandlerManager.Done():
 			break ReceiveLoop
 		case <-p.MessagePump.Done():
 			break ReceiveLoop
 		}
 	}
-	p.KafkaService.Close()
+	p.Transporter.Close()
 	return nil
 }
 
