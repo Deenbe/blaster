@@ -177,8 +177,8 @@ func NewSQSBinder(sqsConfig *SQSConfiguration, config *core.Config) *SQSBinder {
 		Config:           config,
 		MessagePump:      mp,
 		HandlerManager:   hm,
-		Transporter: transporter,
-		awaiter: awaiter,
-		awaitNotifier: awaitNotifier,
+		Transporter:      transporter,
+		awaiter:          awaiter,
+		awaitNotifier:    awaitNotifier,
 	}
 }

@@ -5,7 +5,7 @@ import (
 )
 
 type AwaitNotifier struct {
-	done chan struct{}
+	done   chan struct{}
 	errors chan error
 }
 
@@ -19,7 +19,7 @@ func (n *AwaitNotifier) Notify(err error) {
 
 type Awaiter struct {
 	Notifier *AwaitNotifier
-	fields log.Fields
+	fields   log.Fields
 }
 
 func (a *Awaiter) Done() <-chan struct{} {
@@ -35,12 +35,12 @@ func (a *Awaiter) Wait() {
 
 func NewAwaiter(fields log.Fields) (*Awaiter, *AwaitNotifier) {
 	notifier := &AwaitNotifier{
-		done: make(chan struct{}),
+		done:   make(chan struct{}),
 		errors: make(chan error, 1),
 	}
 
 	return &Awaiter{
 		Notifier: notifier,
-		fields: fields,
+		fields:   fields,
 	}, notifier
 }

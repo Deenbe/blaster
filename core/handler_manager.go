@@ -13,13 +13,13 @@ import (
 )
 
 type HandlerManager struct {
-	Command      string
-	Argv         []string
-	StartupDelay time.Duration
-	HandlerURL   string
-	Awaiter      *Awaiter
+	Command       string
+	Argv          []string
+	StartupDelay  time.Duration
+	HandlerURL    string
+	Awaiter       *Awaiter
 	awaitNotifier *AwaitNotifier
-	logFields    log.Fields
+	logFields     log.Fields
 }
 
 func (h *HandlerManager) Start(ctx context.Context) {
@@ -78,12 +78,12 @@ func NewHandlerManager(command string, argv []string, handlerURL string, startup
 	logFields := log.Fields{"module": "handler_manager"}
 	awaiter, awaitNotifier := NewAwaiter(logFields)
 	return &HandlerManager{
-		Command:      command,
-		Argv:         argv,
-		HandlerURL:   handlerURL,
-		StartupDelay: time.Second * time.Duration(startupDelaySeconds),
-		Awaiter:      awaiter,
+		Command:       command,
+		Argv:          argv,
+		HandlerURL:    handlerURL,
+		StartupDelay:  time.Second * time.Duration(startupDelaySeconds),
+		Awaiter:       awaiter,
 		awaitNotifier: awaitNotifier,
-		logFields:    logFields,
+		logFields:     logFields,
 	}
 }
