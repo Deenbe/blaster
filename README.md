@@ -26,7 +26,7 @@ A typical workflow to consume messages in a message queue is; fetch one message,
 - Read messages in batches to reduce network round-trips.
 - Enhance the work distribution by intelligently filling read ahead buffers. 
 - Retry handling the messages when there are intermittent errors.
-- Reduce the stress on recovering downstream services with the circuit breakers.
+- Reduce the stress on recovering downstream services with circuit breakers.
 - Process multiple messages simultaneously.
 - Prevent exhausting the host resources by throttling the maximum number of messages processed at any given time.
 
