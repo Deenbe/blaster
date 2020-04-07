@@ -40,7 +40,7 @@ var sqsCmd = &cobra.Command{
 		}
 
 		config := GetConfig()
-		binding := sqs.NewSQSBinding(sqsConfig, config)
+		binding := sqs.NewSQSBinder(sqsConfig, config)
 		return core.RunCLIInstance(binding, config)
 	},
 }

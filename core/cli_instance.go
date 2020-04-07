@@ -8,7 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func RunCLIInstance(binding BrokerBinding, config *Config) error {
+func RunCLIInstance(binding BrokerBinder, config *Config) error {
 	if config.EnableVersboseLog {
 		log.SetLevel(log.DebugLevel)
 	}

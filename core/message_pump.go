@@ -15,7 +15,7 @@ type Message struct {
 	Data       map[string]interface{} `jason:-`
 }
 
-type QueueService interface {
+type Transporter interface {
 	Read() ([]*Message, error)
 	Delete(*Message) error
 	Poison(*Message) error
@@ -25,10 +25,10 @@ type Dispatcher interface {
 	Dispatch(*Message) error
 }
 
-// BrokerBinding is how we glue the machinery of message
+// BrokerBinder is how we glue the machinery of message
 // pump and handler manager integration to a particular broker
 // with rest of the system.
-type BrokerBinding interface {
+type BrokerBinder interface {
 	Start(context.Context)
 	Done() <-chan error
 }
@@ -46,7 +46,7 @@ type Config struct {
 }
 
 type MessagePump struct {
-	QueueService QueueService
+	Transporter Transporter
 	Dispatcher   Dispatcher
 	RetryPolicy  *RetryPolicy
 	done         chan error
@@ -71,7 +71,7 @@ func (p *MessagePump) Start(ctx context.Context) {
 			// to MaxHandlers limit.
 			if len(buffer) == 0 {
 				var err error
-				buffer, err = p.QueueService.Read()
+				buffer, err = p.Transporter.Read()
 				if err != nil {
 					log.WithFields(log.Fields{"module": "message_pump", "error": err}).Info("message_pump: failed to read from queue")
 				} else {
@@ -135,7 +135,7 @@ func (p *MessagePump) dispatch(message *Message, sw *Stopwatch) {
 	sw.Lap("handler-invoked")
 	if e != nil {
 		log.Infof("message_pump: failed to dispatch message %s\n", message.MessageID)
-		e = p.QueueService.Poison(message)
+		e = p.Transporter.Poison(message)
 		sw.Lap("poisoned")
 		if e != nil {
 			log.Infof("message_pump: failed to poison message %s\n", message.MessageID)
@@ -144,7 +144,7 @@ func (p *MessagePump) dispatch(message *Message, sw *Stopwatch) {
 	}
 
 	e = p.RetryPolicy.Execute(func() error {
-		return p.QueueService.Delete(message)
+		return p.Transporter.Delete(message)
 	}, "delete message %s", message.MessageID)
 
 	sw.Lap("deleted")
@@ -163,12 +163,12 @@ func (p *MessagePump) close(err error) {
 	close(p.done)
 }
 
-func NewMessagePump(queueReader QueueService, dispatcher Dispatcher, retryCount int, retryDelay time.Duration, maxHandlers int) *MessagePump {
+func NewMessagePump(queueReader Transporter, dispatcher Dispatcher, retryCount int, retryDelay time.Duration, maxHandlers int) *MessagePump {
 	if maxHandlers == 0 {
 		maxHandlers = runtime.NumCPU() * 256
 	}
 	return &MessagePump{
-		QueueService: queueReader,
+		Transporter: queueReader,
 		Dispatcher:   dispatcher,
 		RetryPolicy:  NewRetryPolicy(retryCount, retryDelay),
 		DispatchDone: make(chan struct{}, maxHandlers),

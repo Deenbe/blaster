@@ -14,13 +14,13 @@ import (
 
 const DataItemMessage string = "message"
 
-type KafkaService struct {
+type KafkaTransporter struct {
 	messages chan *core.Message
 	session  sarama.ConsumerGroupSession
 }
 
-func (b *KafkaService) Read() ([]*core.Message, error) {
-	m, ok := <-b.messages
+func (t *KafkaTransporter) Read() ([]*core.Message, error) {
+	m, ok := <-t.messages
 	if !ok {
 		// Channel is closed when PartionHandler is being
 		// cleaned up. Return an empty result so that
@@ -31,27 +31,27 @@ func (b *KafkaService) Read() ([]*core.Message, error) {
 	return []*core.Message{m}, nil
 }
 
-func (b *KafkaService) Delete(m *core.Message) error {
+func (t *KafkaTransporter) Delete(m *core.Message) error {
 	msg := m.Data[DataItemMessage].(*sarama.ConsumerMessage)
 	// TODO: Consider reading the metadata string from the config
-	b.session.MarkMessage(msg, "")
+	t.session.MarkMessage(msg, "")
 	return nil
 }
 
-func (b *KafkaService) Poison(m *core.Message) error {
+func (t *KafkaTransporter) Poison(m *core.Message) error {
 	return nil
 }
 
-func (b *KafkaService) Messages() chan<- *core.Message {
-	return b.messages
+func (t *KafkaTransporter) Messages() chan<- *core.Message {
+	return t.messages
 }
 
-func (b *KafkaService) Close() {
-	close(b.messages)
+func (t *KafkaTransporter) Close() {
+	close(t.messages)
 }
 
 type PartionHandler struct {
-	KafkaService   *KafkaService
+	KafkaService   *KafkaTransporter
 	MessagePump    *core.MessagePump
 	HandlerManager *core.HandlerManager
 	Started        bool
@@ -65,7 +65,7 @@ func (h *PartionHandler) Start(ctx context.Context) {
 type SaramaConsumerGroupHandler struct {
 	PartionHandlers map[int32]*PartionHandler
 	Mutex           sync.Mutex
-	Binding         *KafkaBinding
+	Binding         *KafkaBinder
 	Context         context.Context
 	done            chan struct{}
 }
@@ -80,7 +80,7 @@ func (h *SaramaConsumerGroupHandler) Setup(session sarama.ConsumerGroupSession) 
 			port := core.GetFreePort()
 			handlerURL := fmt.Sprintf("http://localhost:%d/", port)
 			dispatcher := core.NewHttpDispatcher(handlerURL)
-			qsvc := &KafkaService{
+			qsvc := &KafkaTransporter{
 				messages: make(chan *core.Message),
 				session:  session,
 			}
@@ -168,14 +168,14 @@ type KafkaConfig struct {
 	StartFromOldest bool
 }
 
-type KafkaBinding struct {
+type KafkaBinder struct {
 	Group       sarama.ConsumerGroup
 	KafkaConfig *KafkaConfig
 	Config      *core.Config
 	done        chan error
 }
 
-func (b *KafkaBinding) Start(ctx context.Context) {
+func (b *KafkaBinder) Start(ctx context.Context) {
 	go func() {
 		defer b.Group.Close()
 
@@ -213,16 +213,16 @@ func (b *KafkaBinding) Start(ctx context.Context) {
 	}()
 }
 
-func (b *KafkaBinding) Done() <-chan error {
+func (b *KafkaBinder) Done() <-chan error {
 	return b.done
 }
 
-func (b *KafkaBinding) close(err error) {
+func (b *KafkaBinder) close(err error) {
 	b.done <- err
 	close(b.done)
 }
 
-func NewKafkaBinding(kafkaConfig *KafkaConfig, coreConfig *core.Config) (*KafkaBinding, error) {
+func NewKafkaBinder(kafkaConfig *KafkaConfig, coreConfig *core.Config) (*KafkaBinder, error) {
 	config := sarama.NewConfig()
 	config.Version = sarama.V2_4_0_0 // specify appropriate version
 	config.Consumer.Return.Errors = true
@@ -246,7 +246,7 @@ func NewKafkaBinding(kafkaConfig *KafkaConfig, coreConfig *core.Config) (*KafkaB
 		}
 	}()
 
-	return &KafkaBinding{
+	return &KafkaBinder{
 		Group:       g,
 		KafkaConfig: kafkaConfig,
 		Config:      coreConfig,

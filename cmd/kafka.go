@@ -42,7 +42,7 @@ var kafkaCmd = &cobra.Command{
 		}
 
 		config := GetConfig()
-		binding, err := kafka.NewKafkaBinding(kafkaConfig, config)
+		binding, err := kafka.NewKafkaBinder(kafkaConfig, config)
 		if err != nil {
 			return err
 		}

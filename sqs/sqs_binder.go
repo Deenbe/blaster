@@ -17,17 +17,17 @@ type SQSConfiguration struct {
 	WaitTime            int64
 }
 
-type SQSService struct {
+type SQSTransporter struct {
 	Configuration *SQSConfiguration
 	Client        *sqs.SQS
 	QueueUrl      string
 }
 
-func (s *SQSService) Read() ([]*core.Message, error) {
-	msgs, err := s.Client.ReceiveMessage(&sqs.ReceiveMessageInput{
-		QueueUrl:            &s.QueueUrl,
-		MaxNumberOfMessages: &s.Configuration.MaxNumberOfMessages,
-		WaitTimeSeconds:     &s.Configuration.WaitTime,
+func (t *SQSTransporter) Read() ([]*core.Message, error) {
+	msgs, err := t.Client.ReceiveMessage(&sqs.ReceiveMessageInput{
+		QueueUrl:            &t.QueueUrl,
+		MaxNumberOfMessages: &t.Configuration.MaxNumberOfMessages,
+		WaitTimeSeconds:     &t.Configuration.WaitTime,
 	})
 
 	if err != nil {
@@ -53,14 +53,14 @@ func (s *SQSService) Read() ([]*core.Message, error) {
 	return result, nil
 }
 
-func (s *SQSService) Delete(message *core.Message) error {
+func (t *SQSTransporter) Delete(message *core.Message) error {
 	rh, ok := message.Properties["receiptHandle"].(*string)
 	if !ok {
 		panic("Unexpected input: SQS message without a receipt handle")
 	}
 
-	_, err := s.Client.DeleteMessage(&sqs.DeleteMessageInput{
-		QueueUrl:      &s.QueueUrl,
+	_, err := t.Client.DeleteMessage(&sqs.DeleteMessageInput{
+		QueueUrl:      &t.QueueUrl,
 		ReceiptHandle: rh,
 	})
 
@@ -71,11 +71,11 @@ func (s *SQSService) Delete(message *core.Message) error {
 	return nil
 }
 
-func (s *SQSService) Poison(message *core.Message) error {
+func (t *SQSTransporter) Poison(message *core.Message) error {
 	return nil
 }
 
-func NewSQSService(configuration *SQSConfiguration) (*SQSService, error) {
+func NewSQSTransporter(configuration *SQSConfiguration) (*SQSTransporter, error) {
 	s := session.Must(session.NewSession(&aws.Config{
 		Region: aws.String(configuration.Region),
 	}))
@@ -88,14 +88,14 @@ func NewSQSService(configuration *SQSConfiguration) (*SQSService, error) {
 		return nil, errors.WithStack(err)
 	}
 
-	return &SQSService{
+	return &SQSTransporter{
 		Configuration: configuration,
 		Client:        svc,
 		QueueUrl:      *urlResult.QueueUrl,
 	}, nil
 }
 
-type SQSBinding struct {
+type SQSBinder struct {
 	SQSConfiguration *SQSConfiguration
 	Config           *core.Config
 	MessagePump      *core.MessagePump
@@ -103,7 +103,7 @@ type SQSBinding struct {
 	done             chan error
 }
 
-func (b *SQSBinding) Start(ctx context.Context) {
+func (b *SQSBinder) Start(ctx context.Context) {
 	go func() {
 		b.HandlerManager.Start(ctx)
 		b.MessagePump.Start(ctx)
@@ -118,19 +118,19 @@ func (b *SQSBinding) Start(ctx context.Context) {
 	}()
 }
 
-func (b *SQSBinding) Done() <-chan error {
+func (b *SQSBinder) Done() <-chan error {
 	return b.done
 }
 
-func NewSQSBinding(sqsConfig *SQSConfiguration, config *core.Config) *SQSBinding {
-	sqs, err := NewSQSService(sqsConfig)
+func NewSQSBinder(sqsConfig *SQSConfiguration, config *core.Config) *SQSBinder {
+	sqs, err := NewSQSTransporter(sqsConfig)
 	if err != nil {
 		panic(err)
 	}
 	dispatcher := core.NewHttpDispatcher(config.HandlerURL)
 	mp := core.NewMessagePump(sqs, dispatcher, config.RetryCount, config.RetryDelay, config.MaxHandlers)
 	hm := core.NewHandlerManager(config.HandlerCommand, config.HandlerArgs, config.HandlerURL, config.StartupDelaySeconds)
-	return &SQSBinding{
+	return &SQSBinder{
 		SQSConfiguration: sqsConfig,
 		Config:           config,
 		MessagePump:      mp,
