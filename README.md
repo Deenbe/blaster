@@ -48,8 +48,7 @@ const express = require('express');
 const app = express();
 app.use(express.json());
 
-// Messages are submitted to the root as
-// HTTP POST requests
+// Messages are submitted to the handler endpoint as HTTP POST requests
 app.post('/', (req, res) => {
     console.log(req.body);
     res.send('ok');
@@ -64,6 +63,7 @@ app.listen(8312, () => { console.log('listening'); });
 Now that we have a message handler, we can launch blaster to handle messages stored in a supported broker. For instance, to process messages in an AWS SQS queue called test with the script created in step 1, launch blaster with following command (this should be executed in the directory containing node script):
 
 ```
+chmod +x ./handler.js
 blaster sqs --queue-name "test" --region "ap-southeast-2" --handler-command ./handler.js
 ```
 
