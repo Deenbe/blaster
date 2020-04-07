@@ -23,14 +23,16 @@ Blaster is a utility to read messages from a message broker and forward them to 
 ## Introduction
 A typical workflow to consume messages in a message queue is; fetch one message, process, remove and repeat. This seemingly straightforward process however is often convoluted by the logic required to deal with subtleties in message processing. Following list summarises some of the common complexities without being too exhaustive. 
 
-- Batch retrieval 
-- Error handling and retrying
-- Circuit breakers
-- Parallel processing of multiple messages
-- Throttling the maximum number of in-flight messages
-- Avoid starvation (i.e. Avoid buffering messages in internal local queues of busy processes)
+- Read messages in batches to reduce network round-trips.
+- Enhance the work distribution by intelligently filling read ahead buffers. 
+- Retry handling the messages when there are intermittent errors.
+- Reduce the stress on recovering downstream services with the circuit breakers.
+- Process multiple messages simultaneously.
+- Prevent exhausting the host resources by throttling the maximum number of messages processed at any given time.
 
 Blaster simplifies the message handling code by providing a flexible message processing pipeline with built-in features to deal with the well-known complexities. 
+
+It's built with minimum overhead (i.e. cpu/memory) to ensure that the handlers are cost effective when operated in pay-as-you-go infrastructures (e.g. AWS Fargate).
 
 ## Example
 
