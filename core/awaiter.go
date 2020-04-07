@@ -5,42 +5,38 @@ import (
 )
 
 type AwaitNotifier struct {
-	done   chan struct{}
-	errors chan error
+	done chan struct{}
+	err  error
 }
 
 func (n *AwaitNotifier) Notify(err error) {
-	if err != nil {
-		n.errors <- err
-	}
-	close(n.errors)
+	n.err = err
 	close(n.done)
 }
 
 type Awaiter struct {
-	Notifier *AwaitNotifier
+	notifier *AwaitNotifier
 	fields   log.Fields
 }
 
 func (a *Awaiter) Done() <-chan struct{} {
-	return a.Notifier.done
+	return a.notifier.done
 }
 
 func (a *Awaiter) Wait() {
 	<-a.Done()
-	for err := range a.Notifier.done {
-		log.WithFields(a.fields).WithFields(log.Fields{"err": err}).Info("error module shutting down")
+	if a.notifier.err != nil {
+		log.WithFields(a.fields).WithFields(log.Fields{"err": a.notifier.err}).Info("error module shutting down")
 	}
 }
 
 func NewAwaiter(fields log.Fields) (*Awaiter, *AwaitNotifier) {
 	notifier := &AwaitNotifier{
 		done:   make(chan struct{}),
-		errors: make(chan error, 1),
 	}
 
 	return &Awaiter{
-		Notifier: notifier,
+		notifier: notifier,
 		fields:   fields,
 	}, notifier
 }
