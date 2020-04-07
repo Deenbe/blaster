@@ -17,6 +17,7 @@ Blaster is a utility to read messages from a message broker and forward them to 
      - [SQS](#SQS)
      - [Kafka](#Kafka)
 - [Message Schema](#Message-Schema)
+- [Deploy with Docker](#Deploy-With-Docker)
 - [Contributing](#Contributing)
 - [Credits](#Credits)
 
@@ -175,6 +176,25 @@ Since Blaster is designed to work with many different message brokers, it conver
     }
 }
 ```
+
+## Deploy with Docker
+
+To deploy blaster handler in a docker container, copy the linux binary from [Releases](https://github.com/buddyspike/blaster/releases) to the path and set the entry point with desired options.
+
+```
+from node:10.15.3-alpine
+
+RUN mkdir /usr/local/handler
+WORKDIR /usr/local/handler
+COPY .tmp/blaster /usr/local/bin/
+COPY *.js *.json /usr/local/handler/
+
+RUN npm install
+
+ENTRYPOINT ["blaster", "sqs", "--handler-command", "./index.js", "--startup-delay-seconds", "0"]
+```
+
+Full example can be found [here](https://github.com/buddyspike/blaster/tree/master/samples/docker)
 
 ## Contributing
 
