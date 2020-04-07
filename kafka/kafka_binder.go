@@ -56,6 +56,7 @@ type SaramaConsumerGroupHandler struct {
 	Binding         *KafkaBinder
 	Context         context.Context
 	done            chan struct{}
+	logFields       log.Fields
 }
 
 func (h *SaramaConsumerGroupHandler) Setup(session sarama.ConsumerGroupSession) error {
@@ -96,12 +97,12 @@ func (h *SaramaConsumerGroupHandler) Cleanup(session sarama.ConsumerGroupSession
 			v.Transporter.Close()
 		}
 		err := v.HandlerManager.Awaiter.Err()
-		log.WithFields(log.Fields{"module": "consumer_group_handler", "err": err}).Info("handler managed exited")
+		log.WithFields(h.logFields).WithFields(log.Fields{"generationId": session.GenerationID(), "err": err}).Info("handler manager exited")
 		err = v.MessagePump.Awaiter.Err()
-		log.WithFields(log.Fields{"module": "consumer_group_handler", "err": err}).Info("message pump exited")
+		log.WithFields(h.logFields).WithFields(log.Fields{"generationId": session.GenerationID(), "err": err}).Info("message pump exited")
 	}
 	close(h.done)
-	log.WithFields(log.Fields{"module": "consumer_group_handler", "generationId": session.GenerationID()}).Info("consumer group handler is cleaned up")
+	log.WithFields(h.logFields).WithFields(log.Fields{"generationId": session.GenerationID()}).Info("consumer group handler is cleaned up")
 	return nil
 }
 
@@ -122,17 +123,28 @@ func (h *SaramaConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSe
 	// with both MessagePump and HandlerManager, this
 	// should gracefully shutdown all components.
 ReceiveLoop:
-	for msg := range claim.Messages() {
-		m := &core.Message{
-			MessageID:  string(msg.Key),
-			Body:       string(msg.Value),
-			Properties: make(map[string]interface{}),
-			Data:       make(map[string]interface{}),
+	for {
+		var m *core.Message
+		select {
+		case msg, ok := <-claim.Messages():
+			if !ok {
+				break ReceiveLoop
+			}
+			m = &core.Message{
+				MessageID:  string(msg.Key),
+				Body:       string(msg.Value),
+				Properties: make(map[string]interface{}),
+				Data:       make(map[string]interface{}),
+			}
+			m.Properties["timestamp"] = msg.Timestamp
+			m.Properties["partitionId"] = msg.Partition
+			m.Properties["offset"] = msg.Offset
+			m.Data["message"] = msg
+		case <-p.HandlerManager.Awaiter.Done():
+			break ReceiveLoop
+		case <-p.MessagePump.Awaiter.Done():
+			break ReceiveLoop
 		}
-		m.Properties["timestamp"] = msg.Timestamp
-		m.Properties["partitionId"] = msg.Partition
-		m.Properties["offset"] = msg.Offset
-		m.Data["message"] = msg
 
 		select {
 		case p.Transporter.messages <- []*core.Message{m}:
@@ -180,6 +192,7 @@ func (b *KafkaBinder) Start(ctx context.Context) {
 				Context:         ctx,
 				PartionHandlers: make(map[int32]*PartionHandler),
 				done:            make(chan struct{}),
+				logFields:       log.Fields{"module": "consumer_group_handler"},
 			}
 
 			err := b.Group.Consume(ctx, topics, handler)
