@@ -46,7 +46,7 @@ func TestBasicMessageDispatch(t *testing.T) {
 
 	cancelFunc()
 	close(msgs)
-	p.Awaiter.Wait()
+	p.Awaiter.Err()
 }
 
 func TestMaxMessageHandlersWithoutBuffering(t *testing.T) {
@@ -86,7 +86,7 @@ func TestMaxMessageHandlersWithoutBuffering(t *testing.T) {
 
 	cancelFunc()
 	close(msgs)
-	p.Awaiter.Wait()
+	p.Awaiter.Err()
 }
 
 func TestMaxMessageHandlersWithBuffering(t *testing.T) {
@@ -124,7 +124,7 @@ func TestMaxMessageHandlersWithBuffering(t *testing.T) {
 
 	cancelFunc()
 	close(msgs)
-	p.Awaiter.Wait()
+	p.Awaiter.Err()
 }
 
 func TestClosingTransporter(t *testing.T) {
@@ -144,7 +144,7 @@ func TestClosingTransporter(t *testing.T) {
 
 	close(msgs)
 
-	p.Awaiter.Wait()
+	p.Awaiter.Err()
 }
 
 func TestCancelationWhileWaitingForDispatcherToReturn(t *testing.T) {
@@ -172,7 +172,7 @@ func TestCancelationWhileWaitingForDispatcherToReturn(t *testing.T) {
 	p.Start(ctx)
 
 	cancelFunc()
-	p.Awaiter.Wait()
+	p.Awaiter.Err()
 }
 
 func TestPoisoning(t *testing.T) {
@@ -204,5 +204,5 @@ func TestPoisoning(t *testing.T) {
 
 	cancelFunc()
 	close(msgs)
-	p.Awaiter.Wait()
+	p.Awaiter.Err()
 }

@@ -95,8 +95,10 @@ func (h *SaramaConsumerGroupHandler) Cleanup(session sarama.ConsumerGroupSession
 		if !v.Started {
 			v.Transporter.Close()
 		}
-		v.HandlerManager.Awaiter.Wait()
-		v.MessagePump.Awaiter.Wait()
+		err := v.HandlerManager.Awaiter.Err()
+		log.WithFields(log.Fields{"module": "consumer_group_handler", "err": err}).Info("handler managed exited")
+		err = v.MessagePump.Awaiter.Err()
+		log.WithFields(log.Fields{"module": "consumer_group_handler", "err": err}).Info("message pump exited")
 	}
 	close(h.done)
 	log.WithFields(log.Fields{"module": "consumer_group_handler", "generationId": session.GenerationID()}).Info("consumer group handler is cleaned up")
@@ -162,6 +164,7 @@ type KafkaBinder struct {
 	Config        *core.Config
 	awaiter       *core.Awaiter
 	awaitNotifier *core.AwaitNotifier
+	logFields     log.Fields
 }
 
 func (b *KafkaBinder) Start(ctx context.Context) {
@@ -231,12 +234,13 @@ func NewKafkaBinder(kafkaConfig *KafkaConfig, coreConfig *core.Config) (*KafkaBi
 		}
 	}()
 
-	awaiter, awaitNotifier := core.NewAwaiter(logFields)
+	awaiter, awaitNotifier := core.NewAwaiter()
 	return &KafkaBinder{
 		Group:         g,
 		KafkaConfig:   kafkaConfig,
 		Config:        coreConfig,
 		awaiter:       awaiter,
 		awaitNotifier: awaitNotifier,
+		logFields:     logFields,
 	}, nil
 }

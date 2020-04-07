@@ -163,7 +163,7 @@ func NewMessagePump(transporter Transporter, dispatcher Dispatcher, retryCount i
 		maxHandlers = runtime.NumCPU() * 256
 	}
 	logFields := log.Fields{"module": "message_pump"}
-	awaiter, awaitNotifier := NewAwaiter(logFields)
+	awaiter, awaitNotifier := NewAwaiter()
 	return &MessagePump{
 		Transporter:   transporter,
 		Dispatcher:    dispatcher,

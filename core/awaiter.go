@@ -23,20 +23,15 @@ func (a *Awaiter) Done() <-chan struct{} {
 	return a.notifier.done
 }
 
-func (a *Awaiter) Wait() {
+func (a *Awaiter) Err() error {
 	<-a.Done()
-	if a.notifier.err != nil {
-		log.WithFields(a.fields).WithFields(log.Fields{"err": a.notifier.err}).Info("error module shutting down")
-	}
+	return a.notifier.err
 }
 
-func NewAwaiter(fields log.Fields) (*Awaiter, *AwaitNotifier) {
+func NewAwaiter() (*Awaiter, *AwaitNotifier) {
 	notifier := &AwaitNotifier{
 		done:   make(chan struct{}),
 	}
 
-	return &Awaiter{
-		notifier: notifier,
-		fields:   fields,
-	}, notifier
+	return &Awaiter{ notifier: notifier }, notifier
 }

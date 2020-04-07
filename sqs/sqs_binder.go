@@ -118,7 +118,7 @@ func NewSQSTransporter(configuration *SQSConfiguration) (*SQSTransporter, error)
 	}
 
 	logFields := log.Fields{"module": "sqs_transporter"}
-	awaiter, awaitNotifier := core.NewAwaiter(logFields)
+	awaiter, awaitNotifier := core.NewAwaiter()
 	return &SQSTransporter{
 		Configuration: configuration,
 		Client:        svc,
@@ -136,6 +136,7 @@ type SQSBinder struct {
 	Transporter      *SQSTransporter
 	MessagePump      *core.MessagePump
 	HandlerManager   *core.HandlerManager
+	logFields        log.Fields
 	awaiter          *core.Awaiter
 	awaitNotifier    *core.AwaitNotifier
 }
@@ -152,9 +153,13 @@ func (b *SQSBinder) Start(ctx context.Context) {
 		case <-b.Transporter.Awaiter.Done():
 		}
 
-		b.MessagePump.Awaiter.Wait()
-		b.HandlerManager.Awaiter.Wait()
-		b.Transporter.Awaiter.Wait()
+		err := b.MessagePump.Awaiter.Err()
+		log.WithFields(b.logFields).WithField("err", err).Info("message pump exited")
+		err = b.HandlerManager.Awaiter.Err()
+		log.WithFields(b.logFields).WithField("err", err).Info("handler manager exited")
+		err = b.Transporter.Awaiter.Err()
+		log.WithFields(b.logFields).WithField("err", err).Info("sqs transporter exited")
+
 		b.awaitNotifier.Notify(nil)
 	}()
 }
@@ -171,13 +176,14 @@ func NewSQSBinder(sqsConfig *SQSConfiguration, config *core.Config) *SQSBinder {
 	dispatcher := core.NewHttpDispatcher(config.HandlerURL)
 	mp := core.NewMessagePump(transporter, dispatcher, config.RetryCount, config.RetryDelay, config.MaxHandlers)
 	hm := core.NewHandlerManager(config.HandlerCommand, config.HandlerArgs, config.HandlerURL, config.StartupDelaySeconds)
-	awaiter, awaitNotifier := core.NewAwaiter(log.Fields{})
+	awaiter, awaitNotifier := core.NewAwaiter()
 	return &SQSBinder{
 		SQSConfiguration: sqsConfig,
 		Config:           config,
 		MessagePump:      mp,
 		HandlerManager:   hm,
 		Transporter:      transporter,
+		logFields:        log.Fields{"module": "sqs_binder"},
 		awaiter:          awaiter,
 		awaitNotifier:    awaitNotifier,
 	}

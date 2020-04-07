@@ -13,7 +13,6 @@ func RunCLIInstance(binding BrokerBinder, config *Config) error {
 		log.SetLevel(log.DebugLevel)
 	}
 
-	var err error
 	ctx := context.Background()
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
 
@@ -28,6 +27,7 @@ func RunCLIInstance(binding BrokerBinder, config *Config) error {
 	}
 
 	cancelFunc()
-	binding.Awaiter().Wait()
+	err := binding.Awaiter().Err()
+	log.WithFields(log.Fields{"module": "cli_instance", "err": err}).Info("cli instance exited")
 	return err
 }

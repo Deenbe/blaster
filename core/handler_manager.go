@@ -76,7 +76,7 @@ func (h *HandlerManager) Start(ctx context.Context) {
 
 func NewHandlerManager(command string, argv []string, handlerURL string, startupDelaySeconds int) *HandlerManager {
 	logFields := log.Fields{"module": "handler_manager"}
-	awaiter, awaitNotifier := NewAwaiter(logFields)
+	awaiter, awaitNotifier := NewAwaiter()
 	return &HandlerManager{
 		Command:       command,
 		Argv:          argv,

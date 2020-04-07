@@ -18,7 +18,7 @@ func TestExecution(t *testing.T) {
 
 	h := NewHandlerManager("echo", []string{"hey"}, HandlerURL, 0)
 	h.Start(context.Background())
-	h.Awaiter.Wait()
+	h.Awaiter.Err()
 }
 
 func TestCancelleation(t *testing.T) {
@@ -33,7 +33,7 @@ func TestCancelleation(t *testing.T) {
 	h := NewHandlerManager("sleep", []string{"10"}, HandlerURL, 0)
 	h.Start(ctx)
 	cancelFunc()
-	h.Awaiter.Wait()
+	h.Awaiter.Err()
 }
 
 func createTestHandler(done chan<- struct{}) *http.Server {
