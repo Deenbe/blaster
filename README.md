@@ -194,7 +194,7 @@ RUN npm install
 ENTRYPOINT ["blaster", "sqs", "--handler-command", "./index.js", "--startup-delay-seconds", "0"]
 ```
 
-Full example can be found [here](https://github.com/buddyspike/blaster/tree/master/samples/docker)
+Full example can be found [here](https://github.com/buddyspike/blaster/tree/master/samples/docker).
 
 ## Contributing
 
