@@ -30,8 +30,8 @@ func (a *Awaiter) Err() error {
 
 func NewAwaiter() (*Awaiter, *AwaitNotifier) {
 	notifier := &AwaitNotifier{
-		done:   make(chan struct{}),
+		done: make(chan struct{}),
 	}
 
-	return &Awaiter{ notifier: notifier }, notifier
+	return &Awaiter{notifier: notifier}, notifier
 }
