@@ -4,8 +4,6 @@ import (
 	"context"
 	"net/http"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 const HandlerURL string = "http://localhost:8312/"
@@ -20,8 +18,7 @@ func TestExecution(t *testing.T) {
 
 	h := NewHandlerManager("echo", []string{"hey"}, HandlerURL, 0)
 	h.Start(context.Background())
-	err := <-h.Done()
-	assert.NoError(t, err)
+	h.Awaiter.Wait()
 }
 
 func TestCancelleation(t *testing.T) {
@@ -36,8 +33,7 @@ func TestCancelleation(t *testing.T) {
 	h := NewHandlerManager("sleep", []string{"10"}, HandlerURL, 0)
 	h.Start(ctx)
 	cancelFunc()
-	err := <-h.Done()
-	assert.Error(t, err, "context canceled")
+	h.Awaiter.Wait()
 }
 
 func createTestHandler(done chan<- struct{}) *http.Server {

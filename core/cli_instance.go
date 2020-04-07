@@ -23,11 +23,11 @@ func RunCLIInstance(binding BrokerBinder, config *Config) error {
 	binding.Start(cancelCtx)
 
 	select {
-	case err = <-binding.Done():
+	case <-binding.Awaiter().Done():
 	case <-chanSignal:
 	}
 
 	cancelFunc()
-	<-binding.Done()
+	binding.Awaiter().Wait()
 	return err
 }

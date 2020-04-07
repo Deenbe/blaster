@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 type SQSConfiguration struct {
@@ -21,9 +22,59 @@ type SQSTransporter struct {
 	Configuration *SQSConfiguration
 	Client        *sqs.SQS
 	QueueUrl      string
+	messages      chan []*core.Message
+	Awaiter       *core.Awaiter
+	awaitNotifier *core.AwaitNotifier
+	logFields     log.Fields
 }
 
-func (t *SQSTransporter) Read() ([]*core.Message, error) {
+func (t *SQSTransporter) Messages() <-chan []*core.Message {
+	return t.messages
+}
+
+func (t *SQSTransporter) Delete(message *core.Message) error {
+	rh, ok := message.Properties["receiptHandle"].(*string)
+	if !ok {
+		panic("Unexpected input: SQS message without a receipt handle")
+	}
+
+	_, err := t.Client.DeleteMessage(&sqs.DeleteMessageInput{
+		QueueUrl:      &t.QueueUrl,
+		ReceiptHandle: rh,
+	})
+
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
+}
+
+func (t *SQSTransporter) Poison(message *core.Message) error {
+	return nil
+}
+
+func (t *SQSTransporter) Start(ctx context.Context) {
+	go func() {
+		for {
+			batch, err := t.read()
+			if err != nil {
+				log.WithFields(t.logFields).WithFields(log.Fields{"err": err}).Info("error receiving messages from sqs")
+				batch = core.EmptyMessageSet
+			}
+
+			select {
+			case t.messages <- batch:
+			case <-ctx.Done():
+				close(t.messages)
+				t.awaitNotifier.Notify(ctx.Err())
+				return
+			}
+		}
+	}()
+}
+
+func (t *SQSTransporter) read() ([]*core.Message, error) {
 	msgs, err := t.Client.ReceiveMessage(&sqs.ReceiveMessageInput{
 		QueueUrl:            &t.QueueUrl,
 		MaxNumberOfMessages: &t.Configuration.MaxNumberOfMessages,
@@ -53,28 +104,6 @@ func (t *SQSTransporter) Read() ([]*core.Message, error) {
 	return result, nil
 }
 
-func (t *SQSTransporter) Delete(message *core.Message) error {
-	rh, ok := message.Properties["receiptHandle"].(*string)
-	if !ok {
-		panic("Unexpected input: SQS message without a receipt handle")
-	}
-
-	_, err := t.Client.DeleteMessage(&sqs.DeleteMessageInput{
-		QueueUrl:      &t.QueueUrl,
-		ReceiptHandle: rh,
-	})
-
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	return nil
-}
-
-func (t *SQSTransporter) Poison(message *core.Message) error {
-	return nil
-}
-
 func NewSQSTransporter(configuration *SQSConfiguration) (*SQSTransporter, error) {
 	s := session.Must(session.NewSession(&aws.Config{
 		Region: aws.String(configuration.Region),
@@ -88,53 +117,68 @@ func NewSQSTransporter(configuration *SQSConfiguration) (*SQSTransporter, error)
 		return nil, errors.WithStack(err)
 	}
 
+	logFields := log.Fields{"module": "sqs_transporter"}
+	awaiter, awaitNotifier := core.NewAwaiter(logFields)
 	return &SQSTransporter{
 		Configuration: configuration,
 		Client:        svc,
 		QueueUrl:      *urlResult.QueueUrl,
+		Awaiter:       awaiter,
+		awaitNotifier: awaitNotifier,
+		logFields:     logFields,
+		messages:      make(chan []*core.Message),
 	}, nil
 }
 
 type SQSBinder struct {
 	SQSConfiguration *SQSConfiguration
 	Config           *core.Config
+	Transporter      *SQSTransporter
 	MessagePump      *core.MessagePump
 	HandlerManager   *core.HandlerManager
-	done             chan error
+	awaiter          *core.Awaiter
+	awaitNotifier    *core.AwaitNotifier
 }
 
 func (b *SQSBinder) Start(ctx context.Context) {
 	go func() {
 		b.HandlerManager.Start(ctx)
 		b.MessagePump.Start(ctx)
+		b.Transporter.Start(ctx)
 
 		select {
-		case b.done <- <-b.MessagePump.Done():
-		case b.done <- <-b.HandlerManager.Done():
+		case <-b.MessagePump.Awaiter.Done():
+		case <-b.HandlerManager.Awaiter.Done():
+		case <-b.Transporter.Awaiter.Done():
 		}
-		<-b.MessagePump.Done()
-		<-b.HandlerManager.Done()
-		close(b.done)
+
+		b.MessagePump.Awaiter.Wait()
+		b.HandlerManager.Awaiter.Wait()
+		b.Transporter.Awaiter.Wait()
+		b.awaitNotifier.Notify(nil)
 	}()
 }
 
-func (b *SQSBinder) Done() <-chan error {
-	return b.done
+func (b *SQSBinder) Awaiter() *core.Awaiter {
+	return b.awaiter
 }
 
 func NewSQSBinder(sqsConfig *SQSConfiguration, config *core.Config) *SQSBinder {
-	sqs, err := NewSQSTransporter(sqsConfig)
+	transporter, err := NewSQSTransporter(sqsConfig)
 	if err != nil {
 		panic(err)
 	}
 	dispatcher := core.NewHttpDispatcher(config.HandlerURL)
-	mp := core.NewMessagePump(sqs, dispatcher, config.RetryCount, config.RetryDelay, config.MaxHandlers)
+	mp := core.NewMessagePump(transporter, dispatcher, config.RetryCount, config.RetryDelay, config.MaxHandlers)
 	hm := core.NewHandlerManager(config.HandlerCommand, config.HandlerArgs, config.HandlerURL, config.StartupDelaySeconds)
+	awaiter, awaitNotifier := core.NewAwaiter(log.Fields{})
 	return &SQSBinder{
 		SQSConfiguration: sqsConfig,
 		Config:           config,
 		MessagePump:      mp,
 		HandlerManager:   hm,
-		done:             make(chan error),
+		Transporter: transporter,
+		awaiter: awaiter,
+		awaitNotifier: awaitNotifier,
 	}
 }

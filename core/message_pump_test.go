@@ -16,12 +16,13 @@ func TestBasicMessageDispatch(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	q := NewMockQueueService(ctrl)
+	transporter := NewMockTransporter(ctrl)
 	m := &Message{}
+	msgs := make(chan []*Message, 1)
+	msgs <- []*Message{m}
 	events := make(chan string)
-	q.EXPECT().Read().Return([]*Message{m}, nil)
-	q.EXPECT().Read().Return([]*Message{}, nil).AnyTimes()
-	q.EXPECT().Delete(m).DoAndReturn(func(m *Message) error {
+	transporter.EXPECT().Messages().Return(msgs).AnyTimes()
+	transporter.EXPECT().Delete(m).DoAndReturn(func(m *Message) error {
 		events <- "deleted"
 		close(events)
 		return nil
@@ -34,7 +35,7 @@ func TestBasicMessageDispatch(t *testing.T) {
 	})
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	p := NewMessagePump(q, d, 0, time.Second, 0)
+	p := NewMessagePump(transporter, d, 0, time.Second, 0)
 	p.Start(ctx)
 
 	expectedEvents := []string{"dispatched", "deleted"}
@@ -44,7 +45,8 @@ func TestBasicMessageDispatch(t *testing.T) {
 	}
 
 	cancelFunc()
-	<-p.Done()
+	close(msgs)
+	p.Awaiter.Wait()
 }
 
 func TestMaxMessageHandlersWithoutBuffering(t *testing.T) {
@@ -53,19 +55,15 @@ func TestMaxMessageHandlersWithoutBuffering(t *testing.T) {
 
 	events := make(chan string)
 
-	q := NewMockQueueService(ctrl)
+	transporter := NewMockTransporter(ctrl)
 	m1 := &Message{MessageID: "m1"}
 	m2 := &Message{MessageID: "m2"}
-	q.EXPECT().Read().DoAndReturn(func() ([]*Message, error) {
-		events <- "read m1"
-		return []*Message{m1}, nil
-	})
-	q.EXPECT().Read().DoAndReturn(func() ([]*Message, error) {
-		events <- "read m2"
-		return []*Message{m2}, nil
-	})
-	q.EXPECT().Read().Return([]*Message{}, nil).AnyTimes()
-	q.EXPECT().Delete(gomock.Any()).DoAndReturn(func(m *Message) error {
+	msgs := make(chan []*Message, 2)
+	msgs <- []*Message{m1}
+	msgs <- []*Message{m2}
+
+	transporter.EXPECT().Messages().Return(msgs).AnyTimes()
+	transporter.EXPECT().Delete(gomock.Any()).DoAndReturn(func(m *Message) error {
 		events <- fmt.Sprintf("delete %s", m.MessageID)
 		return nil
 	}).AnyTimes()
@@ -78,13 +76,17 @@ func TestMaxMessageHandlersWithoutBuffering(t *testing.T) {
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	p := NewMessagePump(q, d, 0, time.Second, 1)
+	p := NewMessagePump(transporter, d, 0, time.Second, 1)
 	p.Start(ctx)
 
-	expectedOrderOfEvents := []string{"read m1", "dispatch m1", "delete m1", "read m2", "dispatch m2", "delete m2"}
+	expectedOrderOfEvents := []string{"dispatch m1", "delete m1", "dispatch m2", "delete m2"}
 	for _, e := range expectedOrderOfEvents {
 		assert.Equal(t, e, <-events)
 	}
+
+	cancelFunc()
+	close(msgs)
+	p.Awaiter.Wait()
 }
 
 func TestMaxMessageHandlersWithBuffering(t *testing.T) {
@@ -93,15 +95,13 @@ func TestMaxMessageHandlersWithBuffering(t *testing.T) {
 
 	events := make(chan string)
 
-	q := NewMockQueueService(ctrl)
+	transporter := NewMockTransporter(ctrl)
 	m1 := &Message{MessageID: "m1"}
 	m2 := &Message{MessageID: "m2"}
-	q.EXPECT().Read().DoAndReturn(func() ([]*Message, error) {
-		events <- "read m1 and m2"
-		return []*Message{m1, m2}, nil
-	})
-	q.EXPECT().Read().Return([]*Message{}, nil).AnyTimes()
-	q.EXPECT().Delete(gomock.Any()).DoAndReturn(func(m *Message) error {
+	msgs := make(chan []*Message, 1)
+	msgs <- []*Message{m1, m2}
+	transporter.EXPECT().Messages().Return(msgs).AnyTimes()
+	transporter.EXPECT().Delete(gomock.Any()).DoAndReturn(func(m *Message) error {
 		events <- fmt.Sprintf("delete %s", m.MessageID)
 		return nil
 	}).AnyTimes()
@@ -114,36 +114,37 @@ func TestMaxMessageHandlersWithBuffering(t *testing.T) {
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	p := NewMessagePump(q, d, 0, time.Second, 1)
+	p := NewMessagePump(transporter, d, 0, time.Second, 1)
 	p.Start(ctx)
 
-	expectedOrderOfEvents := []string{"read m1 and m2", "dispatch m1", "delete m1", "dispatch m2", "delete m2"}
+	expectedOrderOfEvents := []string{"dispatch m1", "delete m1", "dispatch m2", "delete m2"}
 	for _, e := range expectedOrderOfEvents {
 		assert.Equal(t, e, <-events)
 	}
+
+	cancelFunc()
+	close(msgs)
+	p.Awaiter.Wait()
 }
 
-func TestErrorOnQueueServiceRead(t *testing.T) {
+func TestClosingTransporter(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	done := make(chan struct{})
-
-	q := NewMockQueueService(ctrl)
-	q.EXPECT().Read().Return([]*Message{}, errors.New("doh"))
-	q.EXPECT().Read().DoAndReturn(func() ([]*Message, error) {
-		done <- struct{}{}
-		return []*Message{}, nil
-	}).AnyTimes()
+	msgs := make(chan []*Message)
+	transporter := NewMockTransporter(ctrl)
+	transporter.EXPECT().Messages().Return(msgs).AnyTimes()
 
 	d := NewMockDispatcher(ctrl)
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	p := NewMessagePump(q, d, 0, time.Second, 1)
+	p := NewMessagePump(transporter, d, 0, time.Second, 1)
 	p.Start(ctx)
 
-	<-done
+	close(msgs)
+
+	p.Awaiter.Wait()
 }
 
 func TestCancelationWhileWaitingForDispatcherToReturn(t *testing.T) {
@@ -153,11 +154,12 @@ func TestCancelationWhileWaitingForDispatcherToReturn(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
-	q := NewMockQueueService(ctrl)
+	transporter := NewMockTransporter(ctrl)
 	m1 := &Message{MessageID: "m1"}
-	q.EXPECT().Read().Return([]*Message{m1}, nil)
-	q.EXPECT().Read().Return([]*Message{}, nil).AnyTimes()
-	q.EXPECT().Delete(gomock.Any()).Return(nil).AnyTimes()
+	msgs := make(chan []*Message, 1)
+	msgs <- []*Message{m1}
+
+	transporter.EXPECT().Messages().Return(msgs).AnyTimes()
 
 	d := NewMockDispatcher(ctrl)
 	d.EXPECT().Dispatch(gomock.Any()).Do(func(m *Message) error {
@@ -166,25 +168,26 @@ func TestCancelationWhileWaitingForDispatcherToReturn(t *testing.T) {
 	}).AnyTimes()
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	p := NewMessagePump(q, d, 0, time.Second, 1)
+	p := NewMessagePump(transporter, d, 0, time.Second, 1)
 	p.Start(ctx)
 
 	cancelFunc()
-	<-p.Done()
+	p.Awaiter.Wait()
 }
 
 func TestPoisoning(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	q := NewMockQueueService(ctrl)
+	transporter := NewMockTransporter(ctrl)
 	m1 := &Message{MessageID: "m1"}
-	q.EXPECT().Read().Return([]*Message{m1}, nil)
-	q.EXPECT().Read().Return([]*Message{}, nil).AnyTimes()
+	msgs := make(chan []*Message, 1)
+	msgs <- []*Message{m1}
+	transporter.EXPECT().Messages().Return(msgs).AnyTimes()
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-	q.EXPECT().Poison(m1).DoAndReturn(func(m *Message) error {
+	transporter.EXPECT().Poison(m1).DoAndReturn(func(m *Message) error {
 		wg.Done()
 		return nil
 	})
@@ -195,10 +198,11 @@ func TestPoisoning(t *testing.T) {
 	}).AnyTimes()
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	p := NewMessagePump(q, d, 0, time.Second, 1)
+	p := NewMessagePump(transporter, d, 0, time.Second, 1)
 	p.Start(ctx)
 	wg.Wait()
 
 	cancelFunc()
-	<-p.Done()
+	close(msgs)
+	p.Awaiter.Wait()
 }

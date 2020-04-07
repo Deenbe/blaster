@@ -15,20 +15,12 @@ import (
 const DataItemMessage string = "message"
 
 type KafkaTransporter struct {
-	messages chan *core.Message
+	messages chan []*core.Message
 	session  sarama.ConsumerGroupSession
 }
 
-func (t *KafkaTransporter) Read() ([]*core.Message, error) {
-	m, ok := <-t.messages
-	if !ok {
-		// Channel is closed when PartionHandler is being
-		// cleaned up. Return an empty result so that
-		// the MessagePump can unblock and eventually
-		// shutdown.
-		return []*core.Message{}, nil
-	}
-	return []*core.Message{m}, nil
+func (t *KafkaTransporter) Messages() <-chan []*core.Message {
+	return t.messages
 }
 
 func (t *KafkaTransporter) Delete(m *core.Message) error {
@@ -40,10 +32,6 @@ func (t *KafkaTransporter) Delete(m *core.Message) error {
 
 func (t *KafkaTransporter) Poison(m *core.Message) error {
 	return nil
-}
-
-func (t *KafkaTransporter) Messages() chan<- *core.Message {
-	return t.messages
 }
 
 func (t *KafkaTransporter) Close() {
@@ -81,7 +69,7 @@ func (h *SaramaConsumerGroupHandler) Setup(session sarama.ConsumerGroupSession) 
 			handlerURL := fmt.Sprintf("http://localhost:%d/", port)
 			dispatcher := core.NewHttpDispatcher(handlerURL)
 			qsvc := &KafkaTransporter{
-				messages: make(chan *core.Message),
+				messages: make(chan []*core.Message),
 				session:  session,
 			}
 			pump := core.NewMessagePump(qsvc, dispatcher, config.RetryCount, config.RetryDelay, config.MaxHandlers)
@@ -107,8 +95,8 @@ func (h *SaramaConsumerGroupHandler) Cleanup(session sarama.ConsumerGroupSession
 		if !v.Started {
 			v.Transporter.Close()
 		}
-		<-v.HandlerManager.Done()
-		<-v.MessagePump.Done()
+		v.HandlerManager.Awaiter.Wait()
+		v.MessagePump.Awaiter.Wait()
 	}
 	close(h.done)
 	log.WithFields(log.Fields{"module": "consumer_group_handler", "generationId": session.GenerationID()}).Info("consumer group handler is cleaned up")
@@ -145,10 +133,10 @@ ReceiveLoop:
 		m.Data["message"] = msg
 
 		select {
-		case p.Transporter.Messages() <- m:
-		case <-p.HandlerManager.Done():
+		case p.Transporter.messages <- []*core.Message{m}:
+		case <-p.HandlerManager.Awaiter.Done():
 			break ReceiveLoop
-		case <-p.MessagePump.Done():
+		case <-p.MessagePump.Awaiter.Done():
 			break ReceiveLoop
 		}
 	}
@@ -169,10 +157,11 @@ type KafkaConfig struct {
 }
 
 type KafkaBinder struct {
-	Group       sarama.ConsumerGroup
-	KafkaConfig *KafkaConfig
-	Config      *core.Config
-	done        chan error
+	Group         sarama.ConsumerGroup
+	KafkaConfig   *KafkaConfig
+	Config        *core.Config
+	awaiter       *core.Awaiter
+	awaitNotifier *core.AwaitNotifier
 }
 
 func (b *KafkaBinder) Start(ctx context.Context) {
@@ -192,7 +181,7 @@ func (b *KafkaBinder) Start(ctx context.Context) {
 
 			err := b.Group.Consume(ctx, topics, handler)
 			if err != nil {
-				b.close(err)
+				b.awaitNotifier.Notify(err)
 				return
 			}
 
@@ -205,7 +194,7 @@ func (b *KafkaBinder) Start(ctx context.Context) {
 			// recreated to get the new claims
 			select {
 			case <-ctx.Done():
-				b.close(nil)
+				b.awaitNotifier.Notify(nil)
 				return
 			default:
 			}
@@ -213,13 +202,8 @@ func (b *KafkaBinder) Start(ctx context.Context) {
 	}()
 }
 
-func (b *KafkaBinder) Done() <-chan error {
-	return b.done
-}
-
-func (b *KafkaBinder) close(err error) {
-	b.done <- err
-	close(b.done)
+func (b *KafkaBinder) Awaiter() *core.Awaiter {
+	return b.awaiter
 }
 
 func NewKafkaBinder(kafkaConfig *KafkaConfig, coreConfig *core.Config) (*KafkaBinder, error) {
@@ -239,17 +223,20 @@ func NewKafkaBinder(kafkaConfig *KafkaConfig, coreConfig *core.Config) (*KafkaBi
 		return nil, errors.WithStack(err)
 	}
 
+	logFields := log.Fields{"module": "kafka_binding"}
 	// Track errors
 	go func() {
 		for err := range g.Errors() {
-			log.WithFields(log.Fields{"module": "kafka_binding", "err": err}).Info("error in consumer group")
+			log.WithFields(log.Fields{"err": err}).Info("error in consumer group")
 		}
 	}()
 
+	awaiter, awaitNotifier := core.NewAwaiter(logFields)
 	return &KafkaBinder{
-		Group:       g,
-		KafkaConfig: kafkaConfig,
-		Config:      coreConfig,
-		done:        make(chan error),
+		Group:         g,
+		KafkaConfig:   kafkaConfig,
+		Config:        coreConfig,
+		awaiter:       awaiter,
+		awaitNotifier: awaitNotifier,
 	}, nil
 }

@@ -5,8 +5,11 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
+
+var EmptyMessageSet []*Message = []*Message{}
 
 type Message struct {
 	MessageID  string                 `json:"messageId"`
@@ -16,7 +19,7 @@ type Message struct {
 }
 
 type Transporter interface {
-	Read() ([]*Message, error)
+	Messages() <-chan []*Message
 	Delete(*Message) error
 	Poison(*Message) error
 }
@@ -30,7 +33,7 @@ type Dispatcher interface {
 // with rest of the system.
 type BrokerBinder interface {
 	Start(context.Context)
-	Done() <-chan error
+	Awaiter() *Awaiter
 }
 
 // Config of common knobs.
@@ -46,12 +49,14 @@ type Config struct {
 }
 
 type MessagePump struct {
-	Transporter Transporter
-	Dispatcher   Dispatcher
-	RetryPolicy  *RetryPolicy
-	done         chan error
-	MaxHandlers  int
-	DispatchDone chan struct{}
+	Transporter   Transporter
+	Dispatcher    Dispatcher
+	RetryPolicy   *RetryPolicy
+	Awaiter       *Awaiter
+	MaxHandlers   int
+	DispatchDone  chan struct{}
+	awaitNotifier *AwaitNotifier
+	logFields     log.Fields
 }
 
 // Start the main message pump loop.
@@ -70,13 +75,13 @@ func (p *MessagePump) Start(ctx context.Context) {
 			// read during the previous iteration but not yet dispatched due
 			// to MaxHandlers limit.
 			if len(buffer) == 0 {
-				var err error
-				buffer, err = p.Transporter.Read()
-				if err != nil {
-					log.WithFields(log.Fields{"module": "message_pump", "error": err}).Info("message_pump: failed to read from queue")
-				} else {
-					log.Debugf("messge_pump: received %d messages", len(buffer))
+				buf, ok := <-p.Transporter.Messages()
+				if !ok {
+					p.awaitNotifier.Notify(errors.WithStack(errors.New("transporter closed")))
+					return
 				}
+				buffer = buf
+				log.WithFields(p.logFields).Debugf("received %d messages", len(buffer))
 			}
 
 			// Workout how many messages can be dispatched
@@ -101,7 +106,7 @@ func (p *MessagePump) Start(ctx context.Context) {
 				// the context is cancelled.
 				select {
 				case <-ctx.Done():
-					p.close(ctx.Err())
+					p.awaitNotifier.Notify(ctx.Err())
 					return
 				case <-p.DispatchDone:
 					activeHandlers--
@@ -112,7 +117,7 @@ func (p *MessagePump) Start(ctx context.Context) {
 				// of the loop with a default case.
 				select {
 				case <-ctx.Done():
-					p.close(ctx.Err())
+					p.awaitNotifier.Notify(ctx.Err())
 					return
 				default:
 				}
@@ -124,7 +129,7 @@ func (p *MessagePump) Start(ctx context.Context) {
 func (p *MessagePump) dispatch(message *Message, sw *Stopwatch) {
 	defer func() {
 		p.DispatchDone <- struct{}{}
-		log.WithFields(log.Fields{"messageId": message.MessageID, "duration": sw.Total(), "duration_parts": sw.Laps}).Info("dispatched")
+		log.WithFields(p.logFields).WithFields(log.Fields{"messageId": message.MessageID, "duration": sw.Total(), "duration_parts": sw.Laps}).Info("dispatched")
 	}()
 
 	sw.Lap("scheduled")
@@ -134,11 +139,11 @@ func (p *MessagePump) dispatch(message *Message, sw *Stopwatch) {
 
 	sw.Lap("handler-invoked")
 	if e != nil {
-		log.Infof("message_pump: failed to dispatch message %s\n", message.MessageID)
+		log.WithFields(p.logFields).Infof("message_pump: failed to dispatch message %s\n", message.MessageID)
 		e = p.Transporter.Poison(message)
 		sw.Lap("poisoned")
 		if e != nil {
-			log.Infof("message_pump: failed to poison message %s\n", message.MessageID)
+			log.WithFields(p.logFields).Infof("message_pump: failed to poison message %s\n", message.MessageID)
 		}
 		return
 	}
@@ -149,30 +154,24 @@ func (p *MessagePump) dispatch(message *Message, sw *Stopwatch) {
 
 	sw.Lap("deleted")
 	if e != nil {
-		log.Infof("message_pump: failed to delete message %s\n", message.MessageID)
+		log.WithFields(p.logFields).Infof("message_pump: failed to delete message %s\n", message.MessageID)
 	}
 }
 
-func (p *MessagePump) Done() <-chan error {
-	return p.done
-}
-
-func (p *MessagePump) close(err error) {
-	log.WithFields(log.Fields{"module": "message_pump", "error": err}).Infof("message_pump: stopped")
-	p.done <- err
-	close(p.done)
-}
-
-func NewMessagePump(queueReader Transporter, dispatcher Dispatcher, retryCount int, retryDelay time.Duration, maxHandlers int) *MessagePump {
+func NewMessagePump(transporter Transporter, dispatcher Dispatcher, retryCount int, retryDelay time.Duration, maxHandlers int) *MessagePump {
 	if maxHandlers == 0 {
 		maxHandlers = runtime.NumCPU() * 256
 	}
+	logFields := log.Fields{"module": "message_pump"}
+	awaiter, awaitNotifier := NewAwaiter(logFields)
 	return &MessagePump{
-		Transporter: queueReader,
-		Dispatcher:   dispatcher,
-		RetryPolicy:  NewRetryPolicy(retryCount, retryDelay),
-		DispatchDone: make(chan struct{}, maxHandlers),
-		MaxHandlers:  maxHandlers,
-		done:         make(chan error),
+		Transporter:   transporter,
+		Dispatcher:    dispatcher,
+		RetryPolicy:   NewRetryPolicy(retryCount, retryDelay),
+		DispatchDone:  make(chan struct{}, maxHandlers),
+		MaxHandlers:   maxHandlers,
+		Awaiter:       awaiter,
+		awaitNotifier: awaitNotifier,
+		logFields:     logFields,
 	}
 }
