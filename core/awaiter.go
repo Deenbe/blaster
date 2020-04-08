@@ -21,7 +21,7 @@ func (n *AwaitNotifier) Notify(err error) {
 // Awaiter is a coordination primitive used to
 // signal the completion of an independently executing
 // goroutine.
-// When goroutine A needs to make it's completion observable
+// When goroutine A needs to make its completion observable
 // to B, A should create an Awaiter and its AwaitNotifier counterpart.
 // Then it hands Awaiter reference to B. B can then use either
 // `Done()` channel or `Err()` method to wait for A's completion.
