@@ -13,7 +13,7 @@ clean:
 	rm -rf ./build
 
 test: build
-	CGO_ENABLED=0 go test -timeout 5s -covermode=count -coverpkg="blaster,blaster/lib,blaster/cmd" -coverprofile=build/cover.out ./...
+	CGO_ENABLED=0 go test -timeout 5s -covermode=count -coverpkg="blaster,blaster/core,blaster/cmd,blaster/sqs,blaster/kafka" -coverprofile=build/cover.out ./...
 
 install: build
 	cp "./build/blaster${TARGET}" /usr/local/bin/
