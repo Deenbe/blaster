@@ -10,7 +10,8 @@ app.post('/', (req, res) => {
     return res.send('ok');
 });
 
-// By default blaster forwards messages to http://localhost:8312
+// Bind to the port assigned by blaster or default port. Using default
+// port would only work if the topic has a single partition.
 const port = process.env['BLASTER_HANDLER_PORT'] || 8312;
 app.listen(port, () => {
     console.log('listening on port ', port);

@@ -130,6 +130,31 @@ Blaster uses long polling when receiving messages from SQS. Use this option to c
 
 #### Kafka
 
+Blaster creates a consumer group with the specified name to receive messages from a Kafka topic. An instance of handler executable is launched for each partition assigned to the current blaster instance. Since the handler process is isolated in its own address space, it alleviates the need to synchronise access to shared memory in handler code. As a result of this multi-process design, Kafka message handlers should listen on the designated port advertised via `BLASTER_HANDLER_PORT` environment variable (as shown in the sample code snippet below).
+
+```
+#!/usr/bin/env node
+
+const express = require('express');
+
+const app = express();
+app.use(express.json());
+
+app.post('/', (req, res) => {
+    console.log(`pid: ${process.pid} partion: ${req.body.properties.partitionId} offset: ${req.body.properties.offset} messageId: ${req.body.messageId}: ${req.body.body}`);
+    return res.send('ok');
+});
+
+// Bind to the port assigned by blaster or default port. Using default
+// port would only work if the topic has a single partition.
+const port = process.env['BLASTER_HANDLER_PORT'] || 8312;
+app.listen(port, () => {
+    console.log('listening on port ', port);
+});
+
+```
+Complete example can be found [here](samples/kafaka-node)
+
 `--brokers`
 
 Comma separated list of broker addresses.
