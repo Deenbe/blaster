@@ -132,6 +132,8 @@ Blaster uses long polling when receiving messages from SQS. Use this option to c
 
 Blaster creates a consumer group with the specified name to receive messages from a Kafka topic. An instance of handler executable is launched for each partition assigned to the current blaster instance. Since the handler process is isolated in its own address space, it alleviates the need to synchronise access to shared memory in handler code. As a result of this multi-process design, Kafka message handlers should listen on the designated port advertised via `BLASTER_HANDLER_PORT` environment variable (as shown in the sample code snippet below).
 
+Kafka binding in blaster is also aware of partition re-balances that may occur due to new members (i.e. new blaster instances) joining the consumer group. During a re-balance event, blaster gracefully brings the current handler processes down and launches new ones as per new partition assignment. This is a useful feature to auto scale the message processing nodes based on their resource consumption.
+
 ```
 #!/usr/bin/env node
 
