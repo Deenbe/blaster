@@ -23,7 +23,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var queueName, region string
+var queueName string
 var waitTimeSeconds int64
 var maxNumberOfMesages int64
 
@@ -37,7 +37,6 @@ var sqsCmd = &cobra.Command{
 			QueueName:           queueName,
 			MaxNumberOfMessages: maxNumberOfMesages,
 			WaitTime:            waitTimeSeconds,
-			Region:              region,
 		}
 
 		config := GetConfig()
@@ -59,9 +58,7 @@ func init() {
 	// is called directly, e.g.:
 	// startSqsCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	sqsCmd.Flags().StringVarP(&queueName, "queue-name", "q", "", "queue name")
-	sqsCmd.Flags().StringVarP(&region, "region", "r", "", "queue region")
 	sqsCmd.Flags().Int64VarP(&waitTimeSeconds, "wait-time-seconds", "w", 1, "wait time between polls")
 	sqsCmd.Flags().Int64VarP(&maxNumberOfMesages, "max-number-of-messages", "m", 1, "max number of messages to receive in a single poll")
 	sqsCmd.MarkFlagRequired("queue-name")
-	sqsCmd.MarkFlagRequired("region")
 }

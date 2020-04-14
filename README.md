@@ -65,7 +65,7 @@ Now that we have a message handler, we can launch blaster to handle messages sto
 
 ```
 chmod +x ./handler.js
-blaster sqs --queue-name "test" --region "ap-southeast-2" --handler-command ./handler.js
+AWS_REGION=ap-southeast-2 blaster sqs --queue-name "test" --handler-command ./handler.js
 ```
 
 ## Usage
@@ -112,13 +112,11 @@ Show blaster version
 
 #### SQS
 
-`--region`
-
-AWS region for SQS queue
+Use `AWS_REGION`, `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` env variables to specify the environment of the SQS queue.
 
 `--queue-name`
 
-Name of the queue. Blaster will resolve the queue URL using its name and the region.
+Name of the queue. Blaster will resolve the queue URL using its name and the region set in `AWS_REGION`.
 
 `--max-number-of-messages`
 

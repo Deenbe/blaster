@@ -29,7 +29,6 @@ import (
 
 type SQSConfiguration struct {
 	QueueName           string
-	Region              string
 	MaxNumberOfMessages int64
 	WaitTime            int64
 }
@@ -121,9 +120,7 @@ func (t *SQSTransporter) read() ([]*core.Message, error) {
 }
 
 func NewSQSTransporter(configuration *SQSConfiguration) (*SQSTransporter, error) {
-	s := session.Must(session.NewSession(&aws.Config{
-		Region: aws.String(configuration.Region),
-	}))
+	s := session.Must(session.NewSessionWithOptions(session.Options{}))
 
 	svc := sqs.New(s)
 	urlResult, err := svc.GetQueueUrl(&sqs.GetQueueUrlInput{
