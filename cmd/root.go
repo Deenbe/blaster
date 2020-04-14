@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	homedir "github.com/mitchellh/go-homedir"
+	"github.com/pkg/errors"
 	"github.com/spf13/viper"
 )
 
@@ -39,11 +40,16 @@ var retryCount int
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "blaster",
-	Short: "Universal message pump for message brokers",
-	Long:  `Universal message pump for message brokers`,
+	Short: "A reliable message processing pipeline",
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	//	Run: func(cmd *cobra.Command, args []string) { },
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if cmd.Name() != "version" && handlerCommand == "" {
+			return errors.New("required flag handler-command not set")
+		}
+		return nil
+	},
 	SilenceUsage: true,
 }
 
@@ -58,12 +64,6 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.blaster.yaml)")
-
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	rootCmd.PersistentFlags().StringVar(&handlerCommand, "handler-command", "", "name of handler command")
@@ -74,7 +74,6 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&handlerURL, "handler-url", "http://localhost:8312/", "handler endpoint url")
 	rootCmd.PersistentFlags().IntVarP(&retryCount, "retry-count", "c", 0, "number of retry attempts")
 	rootCmd.PersistentFlags().UintVarP(&retryDelaySeconds, "retry-delay-seconds", "d", 1, "delay between retry attempts")
-	rootCmd.MarkPersistentFlagRequired("handler-command")
 }
 
 // initConfig reads in config file and ENV variables if set.
