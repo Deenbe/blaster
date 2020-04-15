@@ -33,15 +33,14 @@ var sqsCmd = &cobra.Command{
 	Short: "Start blaster for an AWS sqs backend",
 	Long:  ``,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		sqsConfig := &sqs.SQSConfiguration{
+		sqsConfig := sqs.SQSConfiguration{
 			QueueName:           queueName,
 			MaxNumberOfMessages: maxNumberOfMesages,
 			WaitTime:            waitTimeSeconds,
 		}
 
 		config := GetConfig()
-		binding := sqs.NewSQSBinder(sqsConfig, config)
-		return core.RunCLIInstance(binding, config)
+		return core.RunCLIInstance(&sqs.SQSBinderBuilder{}, config, sqsConfig)
 	},
 }
 

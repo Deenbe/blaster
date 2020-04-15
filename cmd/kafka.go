@@ -34,7 +34,7 @@ var kafkaCmd = &cobra.Command{
 	Short: "Start blaster for a kafka backend",
 	Long:  ``,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		kafkaConfig := &kafka.KafkaConfig{
+		kafkaConfig := kafka.KafkaConfig{
 			Topic:           topic,
 			Group:           group,
 			BrokerAddresses: brokerAddresses,
@@ -43,13 +43,7 @@ var kafkaCmd = &cobra.Command{
 		}
 
 		config := GetConfig()
-		binding, err := kafka.NewKafkaBinder(kafkaConfig, config)
-		if err != nil {
-			return err
-		}
-
-		core.RunCLIInstance(binding, config)
-		return nil
+		return core.RunCLIInstance(&kafka.KafkaBinderBuilder{}, config, kafkaConfig)
 	},
 }
 

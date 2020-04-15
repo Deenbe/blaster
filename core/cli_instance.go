@@ -21,12 +21,19 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
-func RunCLIInstance(binding BrokerBinder, config *Config) error {
+func RunCLIInstance(bindingBuilder BrokerBinderBuilder, config *Config, options interface{}) error {
 	if config.EnableVersboseLog {
 		log.SetLevel(log.DebugLevel)
+	}
+
+	runner := NewDefaultMessagePumpRunner()
+	binding, err := bindingBuilder.Build(runner, config, options)
+	if err != nil {
+		return errors.WithStack(err)
 	}
 
 	ctx := context.Background()
@@ -43,7 +50,7 @@ func RunCLIInstance(binding BrokerBinder, config *Config) error {
 	}
 
 	cancelFunc()
-	err := binding.Awaiter().Err()
+	err = binding.Awaiter().Err()
 	log.WithFields(log.Fields{"module": "cli_instance", "err": err}).Info("cli instance exited")
 	return err
 }

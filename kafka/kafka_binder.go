@@ -55,15 +55,9 @@ func (t *KafkaTransporter) Close() {
 }
 
 type PartionHandler struct {
-	Transporter    *KafkaTransporter
-	MessagePump    *core.MessagePump
-	HandlerManager *core.HandlerManager
-	Started        bool
-}
-
-func (h *PartionHandler) Start(ctx context.Context) {
-	h.HandlerManager.Start(ctx)
-	h.MessagePump.Start(ctx)
+	Transporter   *KafkaTransporter
+	RunnerAwaiter *core.Awaiter
+	Started       bool
 }
 
 type SaramaConsumerGroupHandler struct {
@@ -79,25 +73,23 @@ func (h *SaramaConsumerGroupHandler) Setup(session sarama.ConsumerGroupSession) 
 	h.Mutex.Lock()
 	defer h.Mutex.Unlock()
 
-	config := h.Binding.Config
 	for _, partions := range session.Claims() {
 		for _, p := range partions {
+			// Make a copy of the config so that we can use it to
+			// call MessagePumpRunner
+			config := *h.Binding.Config
 			port := core.GetFreePort()
-			handlerURL := fmt.Sprintf("http://localhost:%d/", port)
-			dispatcher := core.NewHttpDispatcher(handlerURL)
-			qsvc := &KafkaTransporter{
+			config.HandlerURL = fmt.Sprintf("http://localhost:%d/", port)
+			transporter := &KafkaTransporter{
 				messages: make(chan []*core.Message),
 				session:  session,
 			}
-			pump := core.NewMessagePump(qsvc, dispatcher, config.RetryCount, config.RetryDelay, config.MaxHandlers)
-			hm := core.NewHandlerManager(config.HandlerCommand, config.HandlerArgs, handlerURL, config.StartupDelaySeconds)
+
 			ph := &PartionHandler{
-				Transporter:    qsvc,
-				MessagePump:    pump,
-				HandlerManager: hm,
+				Transporter:   transporter,
+				RunnerAwaiter: h.Binding.runner.Run(session.Context(), transporter, config),
 			}
 
-			ph.Start(session.Context())
 			h.PartionHandlers[p] = ph
 		}
 	}
@@ -112,9 +104,7 @@ func (h *SaramaConsumerGroupHandler) Cleanup(session sarama.ConsumerGroupSession
 		if !v.Started {
 			v.Transporter.Close()
 		}
-		err := v.HandlerManager.Awaiter.Err()
-		log.WithFields(h.logFields).WithFields(log.Fields{"generationId": session.GenerationID(), "err": err}).Info("handler manager exited")
-		err = v.MessagePump.Awaiter.Err()
+		err := v.RunnerAwaiter.Err()
 		log.WithFields(h.logFields).WithFields(log.Fields{"generationId": session.GenerationID(), "err": err}).Info("message pump exited")
 	}
 	close(h.done)
@@ -156,17 +146,13 @@ ReceiveLoop:
 			m.Properties["partitionId"] = msg.Partition
 			m.Properties["offset"] = msg.Offset
 			m.Data["message"] = msg
-		case <-p.HandlerManager.Awaiter.Done():
-			break ReceiveLoop
-		case <-p.MessagePump.Awaiter.Done():
+		case <-p.RunnerAwaiter.Done():
 			break ReceiveLoop
 		}
 
 		select {
 		case p.Transporter.messages <- []*core.Message{m}:
-		case <-p.HandlerManager.Awaiter.Done():
-			break ReceiveLoop
-		case <-p.MessagePump.Awaiter.Done():
+		case <-p.RunnerAwaiter.Done():
 			break ReceiveLoop
 		}
 	}
@@ -190,6 +176,7 @@ type KafkaBinder struct {
 	Group         sarama.ConsumerGroup
 	KafkaConfig   *KafkaConfig
 	Config        *core.Config
+	runner        core.MessagePumpRunner
 	awaiter       *core.Awaiter
 	awaitNotifier *core.AwaitNotifier
 	logFields     log.Fields
@@ -238,7 +225,11 @@ func (b *KafkaBinder) Awaiter() *core.Awaiter {
 	return b.awaiter
 }
 
-func NewKafkaBinder(kafkaConfig *KafkaConfig, coreConfig *core.Config) (*KafkaBinder, error) {
+type KafkaBinderBuilder struct {
+}
+
+func (b *KafkaBinderBuilder) Build(runner core.MessagePumpRunner, coreConfig *core.Config, options interface{}) (core.BrokerBinder, error) {
+	kafkaConfig := options.(KafkaConfig)
 	config := sarama.NewConfig()
 	config.Version = sarama.V2_4_0_0 // specify appropriate version
 	config.Consumer.Return.Errors = true
@@ -266,8 +257,9 @@ func NewKafkaBinder(kafkaConfig *KafkaConfig, coreConfig *core.Config) (*KafkaBi
 	awaiter, awaitNotifier := core.NewAwaiter()
 	return &KafkaBinder{
 		Group:         g,
-		KafkaConfig:   kafkaConfig,
+		KafkaConfig:   &kafkaConfig,
 		Config:        coreConfig,
+		runner:        runner,
 		awaiter:       awaiter,
 		awaitNotifier: awaitNotifier,
 		logFields:     logFields,

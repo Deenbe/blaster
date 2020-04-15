@@ -34,12 +34,16 @@ type Message struct {
 	Data       map[string]interface{} `json:"-"`
 }
 
+// Transporter is the common interface used to interact with
+// an underlaying broker.
 type Transporter interface {
 	Messages() <-chan []*Message
 	Delete(*Message) error
 	Poison(*Message) error
 }
 
+// Dispatcher is the interface used to deliver the message
+// to the handler process.
 type Dispatcher interface {
 	Dispatch(*Message) error
 }
@@ -47,9 +51,26 @@ type Dispatcher interface {
 // BrokerBinder is how we glue the machinery of message
 // pump and handler manager integration to a particular broker
 // with rest of the system.
+// A BrokerBinder must have a BrokerBinderBuilder counterpart with
+// initialisation logic. BrokerBinder is responsible for initialising
+// the appropriate Transporter and executing the MessagePumpRunner
+// with desired configuration.
 type BrokerBinder interface {
 	Start(context.Context)
 	Awaiter() *Awaiter
+}
+
+// MessagePumpRunner is the interface between a BrokerBinder and
+// the core plumbing of MessagePump and HandlerManager pair.
+// BrokerBinders can use Run method to execute an instance of
+// the pair with specified configuration.
+type MessagePumpRunner interface {
+	Run(context.Context, Transporter, Config) *Awaiter
+}
+
+// BrokerBinderBuilder constructs a BrokerBinder
+type BrokerBinderBuilder interface {
+	Build(MessagePumpRunner, *Config, interface{}) (BrokerBinder, error)
 }
 
 // Config of common knobs.
@@ -68,9 +89,9 @@ type MessagePump struct {
 	Transporter   Transporter
 	Dispatcher    Dispatcher
 	RetryPolicy   *RetryPolicy
-	Awaiter       *Awaiter
 	MaxHandlers   int
 	DispatchDone  chan struct{}
+	awaiter       *Awaiter
 	awaitNotifier *AwaitNotifier
 	logFields     log.Fields
 }
@@ -142,6 +163,10 @@ func (p *MessagePump) Start(ctx context.Context) {
 	}()
 }
 
+func (p *MessagePump) Awaiter() *Awaiter {
+	return p.awaiter
+}
+
 func (p *MessagePump) dispatch(message *Message, sw *Stopwatch) {
 	defer func() {
 		p.DispatchDone <- struct{}{}
@@ -186,8 +211,43 @@ func NewMessagePump(transporter Transporter, dispatcher Dispatcher, retryCount i
 		RetryPolicy:   NewRetryPolicy(retryCount, retryDelay),
 		DispatchDone:  make(chan struct{}, maxHandlers),
 		MaxHandlers:   maxHandlers,
-		Awaiter:       awaiter,
+		awaiter:       awaiter,
 		awaitNotifier: awaitNotifier,
 		logFields:     logFields,
+	}
+}
+
+type DefaultMessagePumpRunner struct {
+	logFields log.Fields
+}
+
+func (r *DefaultMessagePumpRunner) Run(ctx context.Context, transporter Transporter, config Config) *Awaiter {
+	awaiter, awaitNotifier := NewAwaiter()
+	go func() {
+		dispatcher := NewHttpDispatcher(config.HandlerURL)
+		pump := NewMessagePump(transporter, dispatcher, config.RetryCount, config.RetryDelay, config.MaxHandlers)
+		hm := NewHandlerManager(config.HandlerCommand, config.HandlerArgs, config.HandlerURL, config.StartupDelaySeconds)
+		hm.Start(ctx)
+		pump.Start(ctx)
+
+		select {
+		case <-hm.Awaiter.Done():
+		case <-pump.Awaiter().Done():
+		}
+
+		err := hm.Awaiter.Err()
+		log.WithFields(r.logFields).WithField("err", err).Info("handler manager exited")
+
+		err = pump.Awaiter().Err()
+		log.WithFields(r.logFields).WithField("err", err).Info("message pump exited")
+
+		awaitNotifier.Notify(errors.New("default mesage pump runner exited"))
+	}()
+	return awaiter
+}
+
+func NewDefaultMessagePumpRunner() *DefaultMessagePumpRunner {
+	return &DefaultMessagePumpRunner{
+		logFields: log.Fields{"module": "default_message_pump_runner"},
 	}
 }
