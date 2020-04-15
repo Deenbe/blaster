@@ -168,7 +168,7 @@ func (b *SQSBinder) Start(ctx context.Context) {
 		err = b.Transporter.Awaiter.Err()
 		log.WithFields(b.logFields).WithField("err", err).Info("sqs transporter exited")
 
-		b.awaitNotifier.Notify(nil)
+		b.awaitNotifier.Notify(errors.New("sqs binder exited"))
 	}()
 }
 
