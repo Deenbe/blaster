@@ -52,7 +52,7 @@ func TestCancelleation(t *testing.T) {
 	h.Start(ctx)
 	cancelFunc()
 	err := h.Awaiter.Err()
-	assert.EqualError(t, err, "signal: killed")
+	assert.Error(t, err)
 }
 
 func createTestHandler(done chan<- struct{}) *http.Server {
