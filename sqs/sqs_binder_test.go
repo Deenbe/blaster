@@ -30,9 +30,7 @@ type testQueue struct {
 func setupQueue(t *testing.T) *testQueue {
 	buf := make([]byte, 16)
 	count, err := rand.Read(buf)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	if count != len(buf) {
 		t.Fatal(errors.New("insufficient data to generate queue name"))
 	}
@@ -43,9 +41,7 @@ func setupQueue(t *testing.T) *testQueue {
 	result, err := sqssvc.CreateQueue(&sqs.CreateQueueInput{
 		QueueName: aws.String(name),
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	return &testQueue{
 		name:   name,
@@ -59,9 +55,7 @@ func (q *testQueue) Delete(t *testing.T) {
 		QueueUrl: &q.url,
 	})
 
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 }
 
 func TestSQS(t *testing.T) {
@@ -78,13 +72,18 @@ func EndToEnd(t *testing.T, q *testQueue) {
 	awaiter := utils.AwaiterForCancelContext(ctx)
 	messages := make(chan []*core.Message)
 
+	// Setup MessagePumpRunner to read a message off the transport and delete it.
 	runner := mocks.NewMockMessagePumpRunner(ctrl)
 	runner.
 		EXPECT().
 		Run(gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(func(ctx context.Context, transporter core.Transporter, config core.Config) *core.Awaiter {
 			go func() {
-				messages <- <-transporter.Messages()
+				batch := <-transporter.Messages()
+				for _, m := range batch {
+					transporter.Delete(m)
+				}
+				messages <- batch
 				close(messages)
 			}()
 			return awaiter
@@ -100,14 +99,17 @@ func EndToEnd(t *testing.T, q *testQueue) {
 	binder.Start(ctx)
 
 	_, err = q.sqssvc.SendMessage(&sqs.SendMessageInput{QueueUrl: &q.url, MessageBody: aws.String("hey")})
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	received := <-messages
 
 	assert.Len(t, received, 1)
 	assert.Equal(t, "hey", received[0].Body)
+
+	// Ensure the message is deleted
+	attribs, err := q.sqssvc.GetQueueAttributes(&sqs.GetQueueAttributesInput{QueueUrl: &q.url, AttributeNames: []*string{aws.String(sqs.QueueAttributeNameApproximateNumberOfMessages)}})
+	assert.NoError(t, err)
+	assert.Equal(t, "0", *attribs.Attributes[sqs.QueueAttributeNameApproximateNumberOfMessages])
 
 	cancelFunc()
 	err = binder.Awaiter().Err()
