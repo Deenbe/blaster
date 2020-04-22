@@ -1,11 +1,11 @@
 ![blaster](assets/blaster-128.png)
 
 # Blaster
-> A reliable message processing pipeline
+> CLI based message pump
 
 [![Build Status](https://travis-ci.org/buddyspike/blaster.svg?branch=master)](https://travis-ci.org/buddyspike/blaster) [![codecov](https://codecov.io/gh/buddyspike/blaster/branch/master/graph/badge.svg)](https://codecov.io/gh/buddyspike/blaster) [![Go Report Card](https://goreportcard.com/badge/github.com/buddyspike/blaster)](https://goreportcard.com/report/github.com/buddyspike/blaster)
 
-Blaster is a utility to read messages from a message broker and forward them to a message handler over a local http endpoint. Handlers focus on the application logic while Blaster takes care of the complex matters like parallel execution, fault tolerance and quality of service.
+Blaster is a CLI utility to pump messages from various message queue services. Users can write custom message processing logic in their language of choice and rely on Blaster for optimal work scheduling and fault tolerance.
 
 ## Table of Contents
 
@@ -34,6 +34,9 @@ A typical workflow to consume messages in a message queue is; fetch one message,
 Blaster simplifies the message handling code by providing a flexible message processing pipeline with built-in features to deal with the well-known complexities. 
 
 It's built with minimum overhead (i.e. cpu/memory) to ensure that the handlers are cost effective when operated in pay-as-you-go infrastructures (e.g. AWS Fargate).
+
+## How it works
+Blaster has an extensible pipeline to bind to a target queue and efficiently deliver messages to user's message handler. Message handler is launched and managed as a child process of Blaster and communication between the two processes occur via a well defined interface over HTTP.
 
 ## Example
 
@@ -67,6 +70,11 @@ Now that we have a message handler, we can launch blaster to handle messages sto
 chmod +x ./handler.js
 AWS_REGION=ap-southeast-2 blaster sqs --queue-name "test" --handler-command ./handler.js
 ```
+
+## FAQ
+
+**Why doesn't it support forwarding messages to an external HTTP endpoint?**
+Blaster abstracts the complexities of scheduling and fault tolerance in a message consumer. In order to make smart decisions about how work is scheduled, Blaster requires visibility to resource utilisation of user's code handling the message. Blaster does not support delivering messages to an external HTTP point because this level of transparency is not easily achievable with externally managed processes (e.g. They could be executing in a remote host).
 
 ## Usage
 
