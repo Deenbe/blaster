@@ -21,49 +21,17 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/Shopify/sarama"
 	"github.com/pkg/errors"
-
 	log "github.com/sirupsen/logrus"
 )
-
-const DataItemMessage string = "message"
-
-type KafkaTransporter struct {
-	messages chan []*core.Message
-	session  sarama.ConsumerGroupSession
-}
-
-func (t *KafkaTransporter) Messages() <-chan []*core.Message {
-	return t.messages
-}
-
-func (t *KafkaTransporter) Delete(m *core.Message) error {
-	msg := m.Data[DataItemMessage].(*sarama.ConsumerMessage)
-	// TODO: Consider reading the metadata string from the config
-	t.session.MarkMessage(msg, "")
-	return nil
-}
-
-func (t *KafkaTransporter) Poison(m *core.Message) error {
-	return nil
-}
-
-func (t *KafkaTransporter) Close() {
-	close(t.messages)
-}
-
-type PartionHandler struct {
-	Transporter   *KafkaTransporter
-	RunnerAwaiter *core.Awaiter
-	Started       bool
-}
 
 type SaramaConsumerGroupHandler struct {
 	PartionHandlers map[int32]*PartionHandler
 	Mutex           sync.Mutex
-	Binding         *KafkaBinder
+	Binding         *Binder
 	Context         context.Context
 	done            chan struct{}
 	logFields       log.Fields
@@ -75,18 +43,33 @@ func (h *SaramaConsumerGroupHandler) Setup(session sarama.ConsumerGroupSession) 
 
 	for _, partions := range session.Claims() {
 		for _, p := range partions {
+			var committer Committer
 			// Make a copy of the config so that we can use it to
 			// call MessagePumpRunner
 			config := *h.Binding.Config
 			port := core.GetFreePort()
 			config.HandlerURL = fmt.Sprintf("http://localhost:%d/", port)
-			transporter := &KafkaTransporter{
-				messages: make(chan []*core.Message),
-				session:  session,
+			dispatcher := core.NewHttpDispatcher(fmt.Sprintf("%s%s", config.HandlerURL, h.Binding.KafkaConfig.PreCommitHookPath))
+			commitFunc := func(m *sarama.ConsumerMessage) {
+				session.MarkMessage(m, "")
+			}
+
+			if h.Binding.KafkaConfig.CommitBatchSize > 0 {
+				ticker := time.NewTicker(time.Second * time.Duration(h.Binding.KafkaConfig.CommitIntervalSeconds))
+				committer = NewBuferedComitter(h.Binding.KafkaConfig, time.Now, ticker.C, dispatcher, commitFunc)
+			} else {
+				committer = NewDirectCommitter(commitFunc)
+			}
+
+			committer.Start()
+			transporter := &Transporter{
+				messages:  make(chan []*core.Message),
+				committer: committer,
 			}
 
 			ph := &PartionHandler{
 				Transporter:   transporter,
+				Committer:     committer,
 				RunnerAwaiter: h.Binding.runner.Run(session.Context(), transporter, config),
 			}
 
@@ -106,6 +89,8 @@ func (h *SaramaConsumerGroupHandler) Cleanup(session sarama.ConsumerGroupSession
 		}
 		err := v.RunnerAwaiter.Err()
 		log.WithFields(h.logFields).WithFields(log.Fields{"generationId": session.GenerationID(), "err": err}).Info("message pump exited")
+		v.Committer.Stop()
+		<-v.Committer.Awaiter().Done()
 	}
 	close(h.done)
 	log.WithFields(h.logFields).WithFields(log.Fields{"generationId": session.GenerationID()}).Info("consumer group handler is cleaned up")
@@ -145,7 +130,7 @@ ReceiveLoop:
 			m.Properties["timestamp"] = msg.Timestamp
 			m.Properties["partitionId"] = msg.Partition
 			m.Properties["offset"] = msg.Offset
-			m.Data["message"] = msg
+			m.Data[DataItemMessage] = msg
 		case <-p.RunnerAwaiter.Done():
 			break ReceiveLoop
 		}
@@ -162,106 +147,4 @@ ReceiveLoop:
 
 func (h *SaramaConsumerGroupHandler) Done() <-chan struct{} {
 	return h.done
-}
-
-type KafkaConfig struct {
-	Topic           string
-	Group           string
-	BufferSize      int
-	BrokerAddresses []string
-	StartFromOldest bool
-}
-
-type KafkaBinder struct {
-	Group         sarama.ConsumerGroup
-	KafkaConfig   *KafkaConfig
-	Config        *core.Config
-	runner        core.MessagePumpRunner
-	awaiter       *core.Awaiter
-	awaitNotifier *core.AwaitNotifier
-	logFields     log.Fields
-}
-
-func (b *KafkaBinder) Start(ctx context.Context) {
-	go func() {
-		defer b.Group.Close()
-
-		// Iterate over consumer sessions until we have an error
-		// or the context is cancelled.
-		for {
-			topics := []string{b.KafkaConfig.Topic}
-			handler := &SaramaConsumerGroupHandler{
-				Binding:         b,
-				Context:         ctx,
-				PartionHandlers: make(map[int32]*PartionHandler),
-				done:            make(chan struct{}),
-				logFields:       log.Fields{"module": "consumer_group_handler"},
-			}
-
-			err := b.Group.Consume(ctx, topics, handler)
-			if err != nil {
-				b.awaitNotifier.Notify(err)
-				return
-			}
-
-			// Wait for the cleanup of current handler before starting a new one.
-			// TODO: Consider if this can be done in the background.
-			<-handler.Done()
-
-			// `Consume` should be called inside an infinite loop, when a
-			// server-side rebalance happens, the consumer session will need to be
-			// recreated to get the new claims
-			select {
-			case <-ctx.Done():
-				b.awaitNotifier.Notify(nil)
-				return
-			default:
-			}
-		}
-	}()
-}
-
-func (b *KafkaBinder) Awaiter() *core.Awaiter {
-	return b.awaiter
-}
-
-type KafkaBinderBuilder struct {
-}
-
-func (b *KafkaBinderBuilder) Build(runner core.MessagePumpRunner, coreConfig *core.Config, options interface{}) (core.BrokerBinder, error) {
-	kafkaConfig := options.(KafkaConfig)
-	config := sarama.NewConfig()
-	config.Version = sarama.V2_4_0_0 // specify appropriate version
-	config.Consumer.Return.Errors = true
-	if kafkaConfig.StartFromOldest {
-		config.Consumer.Offsets.Initial = sarama.OffsetOldest
-	}
-
-	if kafkaConfig.BufferSize != 0 {
-		config.ChannelBufferSize = kafkaConfig.BufferSize
-	}
-
-	g, err := sarama.NewConsumerGroup(kafkaConfig.BrokerAddresses, kafkaConfig.Group, config)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	logFields := log.Fields{"module": "kafka_binding"}
-	// Track errors
-	go func() {
-		for err := range g.Errors() {
-			log.WithFields(log.Fields{"err": err}).Info("error in consumer group")
-		}
-	}()
-
-	awaiter, awaitNotifier := core.NewAwaiter()
-	return &KafkaBinder{
-		Group:         g,
-		KafkaConfig:   &kafkaConfig,
-		Config:        coreConfig,
-		runner:        runner,
-		awaiter:       awaiter,
-		awaitNotifier: awaitNotifier,
-		logFields:     logFields,
-	}, nil
 }

@@ -25,8 +25,10 @@ import (
 
 var topic, group string
 var brokerAddresses []string
-var bufferSize int
 var startFromOldest bool
+var preCommitHookPath string
+var commitIntervalSeconds int
+var commitBatchSize int
 
 // kafkaCmd represents the kafka command
 var kafkaCmd = &cobra.Command{
@@ -34,12 +36,14 @@ var kafkaCmd = &cobra.Command{
 	Short: "Start blaster for a kafka backend",
 	Long:  ``,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		kafkaConfig := kafka.KafkaConfig{
-			Topic:           topic,
-			Group:           group,
-			BrokerAddresses: brokerAddresses,
-			BufferSize:      bufferSize,
-			StartFromOldest: startFromOldest,
+		kafkaConfig := kafka.Config{
+			Topic:                 topic,
+			Group:                 group,
+			BrokerAddresses:       brokerAddresses,
+			StartFromOldest:       startFromOldest,
+			CommitIntervalSeconds: commitIntervalSeconds,
+			CommitBatchSize:       commitBatchSize,
+			PreCommitHookPath:     preCommitHookPath,
 		}
 
 		config := GetConfig()
@@ -62,7 +66,9 @@ func init() {
 	kafkaCmd.Flags().StringVar(&topic, "topic", "", "topic name")
 	kafkaCmd.Flags().StringVar(&group, "group", "", "group name")
 	kafkaCmd.Flags().StringArrayVar(&brokerAddresses, "brokers", []string{}, "broker addresses")
-	kafkaCmd.Flags().IntVar(&bufferSize, "buffer-size", 0, "number of messages to buffer")
+	kafkaCmd.Flags().IntVar(&commitIntervalSeconds, "commit-interval-seconds", kafka.DefaultCommitIntervalSeconds, "delay before automatically committing the offset of the last message")
+	kafkaCmd.Flags().IntVar(&commitBatchSize, "commit-batch-size", 0, "number of messages to batch before committing")
+	kafkaCmd.Flags().StringVar(&preCommitHookPath, "pre-commit-hook-path", "", "pre commit hook path")
 	kafkaCmd.Flags().BoolVar(&startFromOldest, "start-from-oldest", false, "start consuming messages from the oldest offset")
 
 	kafkaCmd.MarkFlagRequired("topic")

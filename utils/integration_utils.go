@@ -1,4 +1,3 @@
-// +build test
 /*
 Copyright © 2020 Blaster Contributors
 
@@ -6,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-http://www.apache.org/licenses/LICENSE-2.0
+    http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,27 +17,17 @@ limitations under the License.
 package utils
 
 import (
-	"time"
+	"blaster/core"
+	"context"
 )
 
-type TestClock struct {
-	now time.Time
-}
+func AwaiterForCancelContext(ctx context.Context) *core.Awaiter {
+	awaiter, awaitNotifier := core.NewAwaiter()
 
-func (c *TestClock) Now() time.Time {
-	return c.now
-}
+	go func() {
+		<-ctx.Done()
+		awaitNotifier.Notify(ctx.Err())
+	}()
 
-func (c *TestClock) Forward(d time.Duration) {
-	c.now = c.now.Add(d)
-}
-
-func (c *TestClock) Rewind(d time.Duration) {
-	c.now = c.now.Add(d * -1)
-}
-
-func NewTestClock() *TestClock {
-	return &TestClock{
-		now: time.Date(2000, 01, 01, 00, 00, 00, 00, time.Local),
-	}
+	return awaiter
 }
