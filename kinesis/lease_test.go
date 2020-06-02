@@ -19,6 +19,7 @@ package kinesis
 import "time"
 
 type Lease struct {
+	GroupID       string
 	ResourceID    string
 	OwnerID       string
 	Term          uint64
@@ -26,9 +27,35 @@ type Lease struct {
 	State         string
 }
 
-type LeaseManager struct {
+type StateReaderWriter interface {
+	Write(lease *Lease) (bool, error)
+	Read(groupID, resourceID string) (*Lease, error)
+	ReadGroup(groupID string) ([]*Lease, error)
 }
 
-func (m *LeaseManager) Acquire(resourceID, ownerID string) chan struct{} {
+type DynamoDBStateReaderWriter struct {
+}
+
+func (rw *DynamoDBStateReaderWriter) Write(lease *Lease) (bool, error) {
+	panic("not implemented")
+}
+
+func (rw *DynamoDBStateReaderWriter) Read(groupID, resourceID string) (*Lease, error) {
+	panic("not implemented")
+}
+
+func (rw *DynamoDBStateReaderWriter) ReadGroup(groupID string) ([]*Lease, error) {
+	panic("not implemented")
+}
+
+type LeaseController interface {
+	Acquire(groupID, resourceID, ownerID string) (chan struct{}, error)
+}
+
+type DefaultLeaseController struct {
+	readerWriter StateReaderWriter
+}
+
+func (m *DefaultLeaseController) Acquire(groupID, resourceID, ownerID string) (chan struct{}, error) {
 	panic("not implemented")
 }
