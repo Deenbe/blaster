@@ -19,12 +19,23 @@ package kinesis
 import "time"
 
 type Lease struct {
-	GroupID       string
-	ResourceID    string
-	OwnerID       string
-	Term          uint64
-	LastHeartBeat time.Time
-	State         string
+	GroupID          string
+	ResourceID       string
+	OwnerID          string
+	Term             uint64
+	PreviousTerm     uint64
+	LastHeartBeat    time.Time
+	CheckpointOffset uint64
+	CheckpointState  string
+}
+
+type OwnedLease struct {
+	lease *Lease
+	done  chan<- struct{}
+}
+
+func (ol *OwnedLease) Done() chan<- struct{} {
+	return ol.done
 }
 
 type StateReaderWriter interface {
@@ -54,8 +65,52 @@ type LeaseController interface {
 
 type DefaultLeaseController struct {
 	readerWriter StateReaderWriter
+	now          func() time.Time
+	heartbeat    chan<- time.Time
+	leaseTimeout time.Duration
 }
 
-func (m *DefaultLeaseController) Acquire(groupID, resourceID, ownerID string) (chan struct{}, error) {
-	panic("not implemented")
+func (m *DefaultLeaseController) Acquire(groupID, resourceID, ownerID string) (*OwnedLease, error) {
+	lease, err := m.readerWriter.Read(groupID, resourceID)
+	if err != nil {
+		return nil, err
+	}
+	if lease == nil {
+		lease = &Lease{
+			GroupID:    groupID,
+			ResourceID: resourceID,
+			OwnerID:    ownerID,
+		}
+	}
+
+	// If the current lease is active we don't steal it.
+	if m.now().Sub(lease.LastHeartBeat) < m.leaseTimeout {
+		return nil, nil
+	}
+
+	lease.PreviousTerm = lease.Term
+	lease.Term = lease.Term + 1
+	lease.LastHeartBeat = m.now()
+	success, err := m.readerWriter.Write(lease)
+	if err != nil || !success {
+		return nil, err
+	}
+
+	c := make(chan struct{})
+	ol := &OwnedLease{
+		lease: lease,
+		done:  c,
+	}
+
+	m.startHeartbeat(ol)
+	return ol, nil
+}
+
+func (m *DefaultLeaseController) startHeartbeat(ownedLease *OwnedLease) {
+}
+
+func NewLeaseController(stateReaderWriter StateReaderWriter) *DefaultLeaseController {
+	return &DefaultLeaseController{
+		readerWriter: stateReaderWriter,
+	}
 }
